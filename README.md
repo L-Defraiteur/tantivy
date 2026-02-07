@@ -1,85 +1,85 @@
 # ld-tantivy
 
-Fork de [tantivy](https://github.com/quickwit-oss/tantivy) (via [izihawa/tantivy](https://github.com/izihawa/tantivy) v0.26.0) avec trois extensions majeures pour la recherche par contenu : **ContainsQuery**, **byte offsets dans les postings**, et **validation des separateurs**.
+Fork of [tantivy](https://github.com/quickwit-oss/tantivy) (via [izihawa/tantivy](https://github.com/izihawa/tantivy) v0.26.0) with three major extensions for content search: **ContainsQuery**, **byte offsets in postings**, and **separator validation**.
 
 ```
 quickwit-oss/tantivy v0.22
-  -> izihawa/tantivy v0.26.0 (regex phrase queries, FST ameliorations)
-    -> L-Defraiteur/tantivy (ce fork)
+  -> izihawa/tantivy v0.26.0 (regex phrase queries, FST improvements)
+    -> L-Defraiteur/tantivy (this fork)
 ```
 
-## Changements par rapport a upstream
+## Changes from upstream
 
-**39 fichiers modifies, +1873 lignes, -59 lignes** par rapport a `izihawa/tantivy@main`.
+**39 files changed, +1873 lines, -59 lines** compared to `izihawa/tantivy@main`.
 
-### 1. ContainsQuery — recherche multi-strategie avec auto-cascade
+### 1. ContainsQuery — multi-strategy search with auto-cascade
 
-Un nouveau type de query qui cherche des sous-chaines dans les termes indexes, avec fallback automatique par position :
+A new query type that searches for substrings within indexed terms, with automatic fallback per position:
 
-1. **Exact** — lookup direct dans le dictionnaire de termes
-2. **Fuzzy** — automate Levenshtein (distance configurable, defaut 1)
-3. **Substring** — regex `.*token.*` sur le dictionnaire de termes
+1. **Exact** — direct term dictionary lookup
+2. **Fuzzy** — Levenshtein automaton (configurable distance, default 1)
+3. **Substring** — regex `.*token.*` on the term dictionary
 
-Early termination : des qu'un niveau trouve des matches pour une position, les niveaux inferieurs sont ignores.
+Early termination: as soon as one level finds matches for a position, lower levels are skipped.
 
-Pour les queries multi-tokens (`"std::collections"`, `"os.path.join"`), le `PhraseScorer` verifie ensuite que les positions sont consecutives dans le document.
+For multi-token queries (`"std::collections"`, `"os.path.join"`), the `PhraseScorer` then verifies that positions are consecutive in the document.
 
-**Fichiers :**
-- `src/query/phrase_query/automaton_phrase_query.rs` (162 lignes) — struct Query, constructeurs `new()` et `new_with_separators()`
-- `src/query/phrase_query/automaton_phrase_weight.rs` (415 lignes) — Weight avec cascade, `CascadeLevel` enum, 6 tests unitaires
+**Files:**
+- `src/query/phrase_query/automaton_phrase_query.rs` (162 lines) — Query struct, `new()` and `new_with_separators()` constructors
+- `src/query/phrase_query/automaton_phrase_weight.rs` (415 lines) — Weight with cascade, `CascadeLevel` enum, 6 unit tests
 
-### 2. ContainsScorer — validation des separateurs et distance cumulative
+### 2. ContainsScorer — separator validation and cumulative distance
 
-Un scorer custom qui valide que les caracteres non-alphanumeriques (separateurs) entre les tokens de la query correspondent a ceux du document. C'est ce qui permet a `c++` de matcher uniquement les documents contenant `c++` et pas chaque occurrence du mot "c".
+A custom scorer that validates non-alphanumeric characters (separators) between query tokens match those in the document. This is what allows `c++` to match only documents containing `c++` and not every occurrence of the word "c".
 
-**Fonctionnement :**
-- Charge le texte stocke du document
-- Re-tokenise pour obtenir les byte offsets de chaque token
-- Extrait les separateurs reels (texte entre `offset_to[token_i]` et `offset_from[token_i+1]`)
-- Compare avec les separateurs de la query via distance d'edition (Levenshtein)
-- Budget de distance cumulatif global : la somme des distances fuzzy des tokens + distances des separateurs doit rester dans le budget
+**How it works:**
+- Loads the stored text of the document
+- Re-tokenizes to obtain byte offsets of each token
+- Extracts actual separators (text between `offset_to[token_i]` and `offset_from[token_i+1]`)
+- Compares with query separators via edit distance (Levenshtein)
+- Global cumulative distance budget: the sum of fuzzy distances from tokens + separator distances must stay within budget
 
-**Deux modes de validation :**
-- `strict_separators: true` (defaut) — les separateurs doivent correspondre exactement (avec budget edit distance). `c++` ne matche pas `c--` (distance 2 > budget 1)
-- `strict_separators: false` — verifie seulement qu'un caractere non-alphanumerique existe entre les tokens. `c--` matche `c++`, `std collections` matche `std::collections`
+**Two validation modes:**
+- `strict_separators: true` (default) — separators must match exactly (within edit distance budget). `c++` does not match `c--` (distance 2 > budget 1)
+- `strict_separators: false` — only checks that a non-alphanumeric character exists between tokens. `c--` matches `c++`, `std collections` matches `std::collections`
 
-**Contraintes aux bords :**
-- Premier token : pas de contrainte sur ce qui precede dans le document (sauf si la query a des caracteres avant le premier token)
-- Dernier token : idem pour ce qui suit
+**Edge constraints:**
+- First token: no constraint on what precedes it in the document (unless the query has characters before the first token)
+- Last token: same for what follows
 
-**Exemples de matches :**
+**Match examples:**
 
-| Query | Document | Resultat |
-|-------|----------|----------|
-| `c++` | `"c++ and c# are popular"` | match (separateurs `++` valides) |
-| `c++` | `"the cat sat"` | rejet (pas de separateur non-alnum apres "c") |
-| `std::collections` | `"use std::collections::HashMap"` | match (separateur `::` exact) |
-| `os.path.join` | `"import os.path.join for files"` | match (separateurs `.` exacts) |
-| `option<result<(i32` | `"Vec<Option<Result<(i32,&str)>>"` | match (separateurs `<`, `<(` valides) |
+| Query | Document | Result |
+|-------|----------|--------|
+| `c++` | `"c++ and c# are popular"` | match (`++` separators valid) |
+| `c++` | `"the cat sat"` | reject (no non-alnum separator after "c") |
+| `std::collections` | `"use std::collections::HashMap"` | match (`::` separator exact) |
+| `os.path.join` | `"import os.path.join for files"` | match (`.` separators exact) |
+| `option<result<(i32` | `"Vec<Option<Result<(i32,&str)>>"` | match (`<`, `<(` separators valid) |
 
-**Fichier :** `src/query/phrase_query/contains_scorer.rs` (605 lignes) — `ContainsScorer` (multi-token) + `ContainsSingleScorer` (single-token) + `edit_distance()` + `tokenize_raw()`
+**File:** `src/query/phrase_query/contains_scorer.rs` (605 lines) — `ContainsScorer` (multi-token) + `ContainsSingleScorer` (single-token) + `edit_distance()` + `tokenize_raw()`
 
-### 3. WithFreqsAndPositionsAndOffsets — byte offsets dans les postings
+### 3. WithFreqsAndPositionsAndOffsets — byte offsets in postings
 
-Nouveau variant de `IndexRecordOption` qui stocke les byte offsets (`offset_from`, `offset_to`) de chaque occurrence de token directement dans les postings, comme `DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS` de Lucene.
+New `IndexRecordOption` variant that stores byte offsets (`offset_from`, `offset_to`) of each token occurrence directly in the postings, like Lucene's `DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS`.
 
 ```rust
 pub enum IndexRecordOption {
     Basic,                              // doc IDs
     WithFreqs,                          // + term frequencies
-    WithFreqsAndPositions,              // + positions de tokens
-    WithFreqsAndPositionsAndOffsets,    // + byte offsets (NOUVEAU)
+    WithFreqsAndPositions,              // + token positions
+    WithFreqsAndPositionsAndOffsets,    // + byte offsets (NEW)
 }
 ```
 
-**Format de stockage :**
-- Fichier `.offsets` separe (nouveau `SegmentComponent::Offsets`)
-- CompositeFile par champ (meme architecture que `.pos`)
-- Delta-encoding interleave : `(from_delta_0, to_delta_0, from_delta_1, to_delta_1, ...)` — 2 valeurs par token
-- Bitpacked en blocks de 128 (reutilise `PositionSerializer`)
-- `TermInfo` etendu : ajout `offsets_range: Range<usize>` (40 bytes au lieu de 28)
+**Storage format:**
+- Separate `.offsets` file (new `SegmentComponent::Offsets`)
+- CompositeFile per field (same architecture as `.pos`)
+- Interleaved delta-encoding: `(from_delta_0, to_delta_0, from_delta_1, to_delta_1, ...)` — 2 values per token
+- Bitpacked in blocks of 128 (reuses `PositionSerializer`)
+- Extended `TermInfo`: added `offsets_range: Range<usize>` (40 bytes instead of 28)
 
-**Pipeline ecriture :**
+**Write pipeline:**
 ```
 Token (offset_from, offset_to, position)
   -> PostingsWriter::subscribe_with_offsets()
@@ -88,31 +88,31 @@ Token (offset_from, offset_to, position)
   -> PositionSerializer (.offsets) — bitpacked blocks
 ```
 
-**Pipeline lecture :**
+**Read pipeline:**
 ```
 InvertedIndexReader::read_postings_from_terminfo()
   -> PositionReader (.offsets)
   -> SegmentPostings::offsets() -> Vec<(u32, u32)>
 ```
 
-**Propagation a travers les unions :**
-- `SegmentPostings::append_offsets()` — lecture depuis le PositionReader
-- `LoadedPostings::append_offsets()` — depuis les offsets charges en memoire
-- `SimpleUnion::append_offsets()` — merge + sort + dedup des offsets de tous les docsets
-- `BitSetPostingUnion::append_offsets()` — idem
-- `PostingsWithOffset::append_offsets()` — delegation (byte offsets sont absolus)
+**Propagation through unions:**
+- `SegmentPostings::append_offsets()` — reads from PositionReader
+- `LoadedPostings::append_offsets()` — from offsets loaded in memory
+- `SimpleUnion::append_offsets()` — merge + sort + dedup of offsets from all docsets
+- `BitSetPostingUnion::append_offsets()` — same
+- `PostingsWithOffset::append_offsets()` — delegation (byte offsets are absolute)
 
-**21 fichiers modifies** dans `src/schema/`, `src/postings/`, `src/index/`, `src/termdict/`, `src/query/`.
+**21 files modified** across `src/schema/`, `src/postings/`, `src/index/`, `src/termdict/`, `src/query/`.
 
 ## Building
 
 ```bash
-cargo test --lib    # 997 tests (7 ignored — compat format v6/v7)
+cargo test --lib    # 997 tests (7 ignored — format compat v6/v7)
 ```
 
-## Utilisation avec tantivy_fts
+## Usage with tantivy_fts
 
-Ce fork est utilise comme dependance de tantivy_fts, une crate FFI C qui expose la recherche full-text pour [rag3db](https://github.com/L-Defraiteur/rag3db).
+This fork is used as a dependency of tantivy_fts, a C FFI crate that exposes full-text search for [rag3db](https://github.com/L-Defraiteur/rag3db).
 
 ```toml
 [dependencies]
@@ -121,10 +121,10 @@ ld-tantivy = { path = "../ld-tantivy", features = ["stopwords", "lz4-compression
 
 ## Lineage
 
-- [quickwit-oss/tantivy](https://github.com/quickwit-oss/tantivy) — moteur de recherche full-text original en Rust
-- [izihawa/tantivy](https://github.com/izihawa/tantivy) — fork v0.26.0 avec regex phrase queries, ameliorations FST
-- **L-Defraiteur/tantivy** — ce fork : ContainsQuery, byte offsets, validation separateurs, distance cumulative
+- [quickwit-oss/tantivy](https://github.com/quickwit-oss/tantivy) — original full-text search engine in Rust
+- [izihawa/tantivy](https://github.com/izihawa/tantivy) — v0.26.0 fork with regex phrase queries, FST improvements
+- **L-Defraiteur/tantivy** — this fork: ContainsQuery, byte offsets, separator validation, cumulative distance
 
 ## License
 
-MIT — meme licence que tantivy upstream.
+MIT — same license as upstream tantivy.
