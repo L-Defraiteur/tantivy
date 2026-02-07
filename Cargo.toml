@@ -1,5 +1,5 @@
 [package]
-name = "izihawa-tantivy"
+name = "ld-tantivy"
 version = "0.26.0"
 authors = ["Paul Masurel <paul.masurel@gmail.com>"]
 license = "MIT"
@@ -7,7 +7,7 @@ categories = ["database-implementations", "data-structures"]
 description = """Search engine library"""
 documentation = "https://docs.rs/tantivy/"
 homepage = "https://github.com/quickwit-oss/tantivy"
-repository = "https://github.com/izihawa/tantivy"
+repository = "https://github.com/L-Defraiteur/tantivy"
 readme = "README.md"
 keywords = ["search", "information", "retrieval"]
 edition = "2024"
@@ -62,13 +62,13 @@ measure_time = "0.9.0"
 arc-swap = "1.5.0"
 bon = "3.3.1"
 
-columnar = { version = "0.26.0", path = "./columnar", package = "izihawa-tantivy-columnar" }
-sstable = { version = "0.26.0", path = "./sstable", package = "izihawa-tantivy-sstable", optional = true }
-stacker = { version = "0.26.0", path = "./stacker", package = "izihawa-tantivy-stacker" }
-query-grammar = { version = "0.26.0", path = "./query-grammar", package = "izihawa-tantivy-query-grammar" }
-tantivy-bitpacker = { version = "0.26.0", path = "./bitpacker", package = "izihawa-tantivy-bitpacker" }
-common = { version = "0.26.0", path = "./common/", package = "izihawa-tantivy-common" }
-tokenizer-api = { version = "0.26.0", path = "./tokenizer-api", package = "izihawa-tantivy-tokenizer-api" }
+columnar = { version = "0.26.0", path = "./columnar", package = "ld-tantivy-columnar" }
+sstable = { version = "0.26.0", path = "./sstable", package = "ld-tantivy-sstable", optional = true }
+stacker = { version = "0.26.0", path = "./stacker", package = "ld-tantivy-stacker" }
+query-grammar = { version = "0.26.0", path = "./query-grammar", package = "ld-tantivy-query-grammar" }
+tantivy-bitpacker = { version = "0.26.0", path = "./bitpacker", package = "ld-tantivy-bitpacker" }
+common = { version = "0.26.0", path = "./common/", package = "ld-tantivy-common" }
+tokenizer-api = { version = "0.26.0", path = "./tokenizer-api", package = "ld-tantivy-tokenizer-api" }
 sketches-ddsketch = { version = "0.3.0", features = ["use_serde"] }
 hyperloglogplus = { version = "0.4.1", features = ["const-loop"] }
 futures-util = { version = "0.3.28", optional = true }

@@ -1,5 +1,5 @@
 [package]
-name = "izihawa-tantivy-bitpacker"
+name = "ld-tantivy-bitpacker"
 version = "0.26.0"
 edition = "2024"
 authors = ["Paul Masurel <paul.masurel@gmail.com>"]

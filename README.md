@@ -1,143 +1,130 @@
-[![Docs](https://docs.rs/tantivy/badge.svg)](https://docs.rs/crate/tantivy/)
-[![Build Status](https://github.com/quickwit-oss/tantivy/actions/workflows/test.yml/badge.svg)](https://github.com/quickwit-oss/tantivy/actions/workflows/test.yml)
-[![codecov](https://codecov.io/gh/quickwit-oss/tantivy/branch/main/graph/badge.svg)](https://codecov.io/gh/quickwit-oss/tantivy)
-[![Join the chat at https://discord.gg/MT27AG5EVE](https://shields.io/discord/908281611840282624?label=chat%20on%20discord)](https://discord.gg/MT27AG5EVE)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Crates.io](https://img.shields.io/crates/v/tantivy.svg)](https://crates.io/crates/tantivy)
+# ld-tantivy
 
-<img src="https://tantivy-search.github.io/logo/tantivy-logo.png" alt="Tantivy, the fastest full-text search engine library written in Rust" height="250">
+Fork de [tantivy](https://github.com/quickwit-oss/tantivy) (via [izihawa/tantivy](https://github.com/izihawa/tantivy) v0.26.0) avec trois extensions majeures pour la recherche par contenu : **ContainsQuery**, **byte offsets dans les postings**, et **validation des separateurs**.
 
-## Fast full-text search engine library written in Rust
-
-**If you are looking for an alternative to Elasticsearch or Apache Solr, check out [Quickwit](https://github.com/quickwit-oss/quickwit), our distributed search engine built on top of Tantivy.**
-
-Tantivy is closer to [Apache Lucene](https://lucene.apache.org/) than to [Elasticsearch](https://www.elastic.co/products/elasticsearch) or [Apache Solr](https://lucene.apache.org/solr/) in the sense it is not
-an off-the-shelf search engine server, but rather a crate that can be used to build such a search engine.
-
-Tantivy is, in fact, strongly inspired by Lucene's design.
-
-## Benchmark
-
-The following [benchmark](https://tantivy-search.github.io/bench/) breaks down the
-performance for different types of queries/collections.
-
-Your mileage WILL vary depending on the nature of queries and their load.
-
-Details about the benchmark can be found at this [repository](https://github.com/quickwit-oss/search-benchmark-game).
-
-## Features
-
-- Full-text search
-- Configurable tokenizer (stemming available for 17 Latin languages) with third party support for Chinese ([tantivy-jieba](https://crates.io/crates/tantivy-jieba) and [cang-jie](https://crates.io/crates/cang-jie)), Japanese ([lindera](https://github.com/lindera-morphology/lindera-tantivy), [Vaporetto](https://crates.io/crates/vaporetto_tantivy), and [tantivy-tokenizer-tiny-segmenter](https://crates.io/crates/tantivy-tokenizer-tiny-segmenter)) and Korean ([lindera](https://github.com/lindera-morphology/lindera-tantivy) + [lindera-ko-dic-builder](https://github.com/lindera-morphology/lindera-ko-dic-builder))
-- Fast (check out the :racehorse: :sparkles: [benchmark](https://tantivy-search.github.io/bench/) :sparkles: :racehorse:)
-- Tiny startup time (<10ms), perfect for command-line tools
-- BM25 scoring (the same as Lucene)
-- Natural query language (e.g. `(michael AND jackson) OR "king of pop"`)
-- Phrase queries search (e.g. `"michael jackson"`)
-- Incremental indexing
-- Multithreaded indexing (indexing English Wikipedia takes < 3 minutes on my desktop)
-- Mmap directory
-- SIMD integer compression when the platform/CPU includes the SSE2 instruction set
-- Single valued and multivalued u64, i64, and f64 fast fields (equivalent of doc values in Lucene)
-- `&[u8]` fast fields
-- Text, i64, u64, f64, dates, ip, bool, and hierarchical facet fields
-- Compressed document store (LZ4, Zstd, None)
-- Range queries
-- Faceted search
-- Configurable indexing (optional term frequency and position indexing)
-- JSON Field
-- Aggregation Collector: histogram, range buckets, average, and stats metrics
-- LogMergePolicy with deletes
-- Searcher Warmer API
-- Cheesy logo with a horse
-
-### Non-features
-
-Distributed search is out of the scope of Tantivy, but if you are looking for this feature, check out [Quickwit](https://github.com/quickwit-oss/quickwit/).
-
-## Getting started
-
-Tantivy works on stable Rust and supports Linux, macOS, and Windows.
-
-- [Tantivy's simple search example](https://tantivy-search.github.io/examples/basic_search.html)
-- [tantivy-cli and its tutorial](https://github.com/quickwit-oss/tantivy-cli) - `tantivy-cli` is an actual command-line interface that makes it easy for you to create a search engine,
-index documents, and search via the CLI or a small server with a REST API.
-It walks you through getting a Wikipedia search engine up and running in a few minutes.
-- [Reference doc for the last released version](https://docs.rs/tantivy/)
-
-## How can I support this project?
-
-There are many ways to support this project.
-
-- Use Tantivy and tell us about your experience on [Discord](https://discord.gg/MT27AG5EVE) or by email (paul.masurel@gmail.com)
-- Report bugs
-- Write a blog post
-- Help with documentation by asking questions or submitting PRs
-- Contribute code (you can join [our Discord server](https://discord.gg/MT27AG5EVE))
-- Talk about Tantivy around you
-
-## Contributing code
-
-We use the GitHub Pull Request workflow: reference a GitHub ticket and/or include a comprehensive commit message when opening a PR.
-Feel free to update CHANGELOG.md with your contribution.
-
-### Tokenizer
-
-When implementing a tokenizer for tantivy depend on the `tantivy-tokenizer-api` crate.
-
-### Clone and build locally
-
-Tantivy compiles on stable Rust.
-To check out and run tests, you can simply run:
-
-```bash
-git clone https://github.com/quickwit-oss/tantivy.git
-cd tantivy
-cargo test
+```
+quickwit-oss/tantivy v0.22
+  -> izihawa/tantivy v0.26.0 (regex phrase queries, FST ameliorations)
+    -> L-Defraiteur/tantivy (ce fork)
 ```
 
-## Companies Using Tantivy
+## Changements par rapport a upstream
 
-<p align="left">
-<img align="center" src="doc/assets/images/etsy.png" alt="Etsy" height="25" width="auto" /> &nbsp;
-<img align="center" src="doc/assets/images/paradedb.png" alt="ParadeDB" height="25" width="auto" /> &nbsp;
-<img align="center" src="doc/assets/images/Nuclia.png#gh-light-mode-only" alt="Nuclia" height="25" width="auto" /> &nbsp;
-<img align="center" src="doc/assets/images/humanfirst.png#gh-light-mode-only" alt="Humanfirst.ai" height="30" width="auto" />
-<img align="center" src="doc/assets/images/element.io.svg#gh-light-mode-only" alt="Element.io" height="25" width="auto" />
-<img align="center" src="doc/assets/images/nuclia-dark-theme.png#gh-dark-mode-only" alt="Nuclia" height="35" width="auto" /> &nbsp;
-<img align="center" src="doc/assets/images/humanfirst.ai-dark-theme.png#gh-dark-mode-only" alt="Humanfirst.ai" height="25" width="auto" />&nbsp; &nbsp;
-<img align="center" src="doc/assets/images/element-dark-theme.png#gh-dark-mode-only" alt="Element.io" height="25" width="auto" />
-</p>
+**39 fichiers modifies, +1873 lignes, -59 lignes** par rapport a `izihawa/tantivy@main`.
 
-## FAQ
+### 1. ContainsQuery — recherche multi-strategie avec auto-cascade
 
-### Can I use Tantivy in other languages?
+Un nouveau type de query qui cherche des sous-chaines dans les termes indexes, avec fallback automatique par position :
 
-- Python → [tantivy-py](https://github.com/quickwit-oss/tantivy-py)
-- Ruby → [tantiny](https://github.com/baygeldin/tantiny)
+1. **Exact** — lookup direct dans le dictionnaire de termes
+2. **Fuzzy** — automate Levenshtein (distance configurable, defaut 1)
+3. **Substring** — regex `.*token.*` sur le dictionnaire de termes
 
-You can also find other bindings on [GitHub](https://github.com/search?q=tantivy) but they may be less maintained.
+Early termination : des qu'un niveau trouve des matches pour une position, les niveaux inferieurs sont ignores.
 
-### What are some examples of Tantivy use?
+Pour les queries multi-tokens (`"std::collections"`, `"os.path.join"`), le `PhraseScorer` verifie ensuite que les positions sont consecutives dans le document.
 
-- [seshat](https://github.com/matrix-org/seshat/): A matrix message database/indexer
-- [tantiny](https://github.com/baygeldin/tantiny): Tiny full-text search for Ruby
-- [lnx](https://github.com/lnx-search/lnx): adaptable, typo tolerant search engine with a REST API
-- [Bichon](https://github.com/rustmailer/bichon): A lightweight, high-performance Rust email archiver with WebUI
-- and [more](https://github.com/search?q=tantivy)!
+**Fichiers :**
+- `src/query/phrase_query/automaton_phrase_query.rs` (162 lignes) — struct Query, constructeurs `new()` et `new_with_separators()`
+- `src/query/phrase_query/automaton_phrase_weight.rs` (415 lignes) — Weight avec cascade, `CascadeLevel` enum, 6 tests unitaires
 
-### On average, how much faster is Tantivy compared to Lucene?
+### 2. ContainsScorer — validation des separateurs et distance cumulative
 
-- According to our [search latency benchmark](https://tantivy-search.github.io/bench/), Tantivy is approximately 2x faster than Lucene.
+Un scorer custom qui valide que les caracteres non-alphanumeriques (separateurs) entre les tokens de la query correspondent a ceux du document. C'est ce qui permet a `c++` de matcher uniquement les documents contenant `c++` et pas chaque occurrence du mot "c".
 
-### Does tantivy support incremental indexing?
+**Fonctionnement :**
+- Charge le texte stocke du document
+- Re-tokenise pour obtenir les byte offsets de chaque token
+- Extrait les separateurs reels (texte entre `offset_to[token_i]` et `offset_from[token_i+1]`)
+- Compare avec les separateurs de la query via distance d'edition (Levenshtein)
+- Budget de distance cumulatif global : la somme des distances fuzzy des tokens + distances des separateurs doit rester dans le budget
 
-- Yes.
+**Deux modes de validation :**
+- `strict_separators: true` (defaut) — les separateurs doivent correspondre exactement (avec budget edit distance). `c++` ne matche pas `c--` (distance 2 > budget 1)
+- `strict_separators: false` — verifie seulement qu'un caractere non-alphanumerique existe entre les tokens. `c--` matche `c++`, `std collections` matche `std::collections`
 
-### How can I edit documents?
+**Contraintes aux bords :**
+- Premier token : pas de contrainte sur ce qui precede dans le document (sauf si la query a des caracteres avant le premier token)
+- Dernier token : idem pour ce qui suit
 
-- Data in tantivy is immutable. To edit a document, the document needs to be deleted and reindexed.
+**Exemples de matches :**
 
-### When will my documents be searchable during indexing?
+| Query | Document | Resultat |
+|-------|----------|----------|
+| `c++` | `"c++ and c# are popular"` | match (separateurs `++` valides) |
+| `c++` | `"the cat sat"` | rejet (pas de separateur non-alnum apres "c") |
+| `std::collections` | `"use std::collections::HashMap"` | match (separateur `::` exact) |
+| `os.path.join` | `"import os.path.join for files"` | match (separateurs `.` exacts) |
+| `option<result<(i32` | `"Vec<Option<Result<(i32,&str)>>"` | match (separateurs `<`, `<(` valides) |
 
-- Documents will be searchable after a `commit` is called on an `IndexWriter`. Existing `IndexReader`s will also need to be reloaded in order to reflect the changes. Finally, changes are only visible to newly acquired `Searcher`.
+**Fichier :** `src/query/phrase_query/contains_scorer.rs` (605 lignes) — `ContainsScorer` (multi-token) + `ContainsSingleScorer` (single-token) + `edit_distance()` + `tokenize_raw()`
+
+### 3. WithFreqsAndPositionsAndOffsets — byte offsets dans les postings
+
+Nouveau variant de `IndexRecordOption` qui stocke les byte offsets (`offset_from`, `offset_to`) de chaque occurrence de token directement dans les postings, comme `DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS` de Lucene.
+
+```rust
+pub enum IndexRecordOption {
+    Basic,                              // doc IDs
+    WithFreqs,                          // + term frequencies
+    WithFreqsAndPositions,              // + positions de tokens
+    WithFreqsAndPositionsAndOffsets,    // + byte offsets (NOUVEAU)
+}
+```
+
+**Format de stockage :**
+- Fichier `.offsets` separe (nouveau `SegmentComponent::Offsets`)
+- CompositeFile par champ (meme architecture que `.pos`)
+- Delta-encoding interleave : `(from_delta_0, to_delta_0, from_delta_1, to_delta_1, ...)` — 2 valeurs par token
+- Bitpacked en blocks de 128 (reutilise `PositionSerializer`)
+- `TermInfo` etendu : ajout `offsets_range: Range<usize>` (40 bytes au lieu de 28)
+
+**Pipeline ecriture :**
+```
+Token (offset_from, offset_to, position)
+  -> PostingsWriter::subscribe_with_offsets()
+  -> TfPositionAndOffsetRecorder::record_position_with_offsets()
+  -> FieldSerializer::write_doc_with_offsets()
+  -> PositionSerializer (.offsets) — bitpacked blocks
+```
+
+**Pipeline lecture :**
+```
+InvertedIndexReader::read_postings_from_terminfo()
+  -> PositionReader (.offsets)
+  -> SegmentPostings::offsets() -> Vec<(u32, u32)>
+```
+
+**Propagation a travers les unions :**
+- `SegmentPostings::append_offsets()` — lecture depuis le PositionReader
+- `LoadedPostings::append_offsets()` — depuis les offsets charges en memoire
+- `SimpleUnion::append_offsets()` — merge + sort + dedup des offsets de tous les docsets
+- `BitSetPostingUnion::append_offsets()` — idem
+- `PostingsWithOffset::append_offsets()` — delegation (byte offsets sont absolus)
+
+**21 fichiers modifies** dans `src/schema/`, `src/postings/`, `src/index/`, `src/termdict/`, `src/query/`.
+
+## Building
+
+```bash
+cargo test --lib    # 997 tests (7 ignored — compat format v6/v7)
+```
+
+## Utilisation avec tantivy_fts
+
+Ce fork est utilise comme dependance de tantivy_fts, une crate FFI C qui expose la recherche full-text pour [rag3db](https://github.com/L-Defraiteur/rag3db).
+
+```toml
+[dependencies]
+ld-tantivy = { path = "../ld-tantivy", features = ["stopwords", "lz4-compression", "stemmer"] }
+```
+
+## Lineage
+
+- [quickwit-oss/tantivy](https://github.com/quickwit-oss/tantivy) — moteur de recherche full-text original en Rust
+- [izihawa/tantivy](https://github.com/izihawa/tantivy) — fork v0.26.0 avec regex phrase queries, ameliorations FST
+- **L-Defraiteur/tantivy** — ce fork : ContainsQuery, byte offsets, validation separateurs, distance cumulative
+
+## License
+
+MIT — meme licence que tantivy upstream.

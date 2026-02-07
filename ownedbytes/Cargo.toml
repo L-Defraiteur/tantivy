@@ -1,6 +1,6 @@
 [package]
 authors = ["Paul Masurel <paul@quickwit.io>", "Pascal Seitz <pascal@quickwit.io>"]
-name = "izihawa-ownedbytes"
+name = "ld-ownedbytes"
 version = "0.26.0"
 edition = "2024"
 description = "Expose data as static slice"
