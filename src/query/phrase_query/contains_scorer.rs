@@ -225,32 +225,80 @@ impl<TPostings: Postings> ContainsScorer<TPostings> {
         }
     }
 
-    /// Validate separators by loading stored text and re-tokenizing.
+    /// Validate separators using byte offsets from postings when available
+    /// (WithFreqsAndPositionsAndOffsets), falling back to re-tokenization otherwise.
     /// Returns Some(count) of valid occurrences, or None on error.
-    fn validate_separators(&self, starting_positions: &[u32]) -> Option<u32> {
+    fn validate_separators(&mut self, starting_positions: &[u32]) -> Option<u32> {
+        if starting_positions.is_empty() {
+            return Some(0);
+        }
+
+        // Collect (position, byte_from, byte_to) from postings for each term
+        let mut term_tuples: Vec<Vec<(u32, u32, u32)>> = Vec::with_capacity(self.num_terms);
+        for i in 0..self.num_terms {
+            let mut tuples = Vec::new();
+            self.intersection_docset
+                .docset_mut_specialized(i)
+                .positions_and_offsets(&mut tuples);
+            term_tuples.push(tuples);
+        }
+        let has_offsets = term_tuples
+            .iter()
+            .any(|t| t.iter().any(|&(_, _, to)| to > 0));
+
+        // Load stored text
         let doc_id = self.intersection_docset.doc();
         let doc: TantivyDocument = self.store_reader.get(doc_id).ok()?;
         let stored_text = doc.get_first(self.field)?.as_str()?.to_string();
-        let doc_tokens = tokenize_raw(&stored_text);
+
+        // Fallback: tokenize if no offsets in index
+        let doc_tokens = if !has_offsets {
+            Some(tokenize_raw(&stored_text))
+        } else {
+            None
+        };
 
         let mut count = 0u32;
         for &start_pos in starting_positions {
-            // The starting position in left_positions is offset by max_offset
-            // First token in phrase is at position (start_pos - max_offset) in the document
-            let first_doc_pos = start_pos as usize;
-            // With the offset scheme: position stored = doc_position + max_offset - term_offset
-            // For term 0 (offset 0): stored = doc_pos + max_offset
-            // So doc_pos = stored - max_offset
-            if first_doc_pos < self.max_offset {
+            if (start_pos as usize) < self.max_offset {
                 continue;
             }
-            let first_doc_pos = first_doc_pos - self.max_offset;
+            let first_doc_pos = (start_pos as usize) - self.max_offset;
 
-            // Check all tokens are within range
-            let last_doc_pos = first_doc_pos + self.num_terms - 1;
-            if last_doc_pos >= doc_tokens.len() {
-                continue;
-            }
+            // Get byte offsets for each token in this phrase occurrence
+            let token_offsets: Option<Vec<(usize, usize)>> = if has_offsets {
+                // Use byte offsets from postings (all terms have adjusted pos == start_pos)
+                let mut offsets = Vec::with_capacity(self.num_terms);
+                let mut ok = true;
+                for tuples in &term_tuples {
+                    if let Some(&(_, from, to)) =
+                        tuples.iter().find(|&&(pos, _, _)| pos == start_pos)
+                    {
+                        offsets.push((from as usize, to as usize));
+                    } else {
+                        ok = false;
+                        break;
+                    }
+                }
+                if ok { Some(offsets) } else { None }
+            } else {
+                // Fallback: use re-tokenized offsets
+                let doc_tokens = doc_tokens.as_ref().unwrap();
+                let last_doc_pos = first_doc_pos + self.num_terms - 1;
+                if last_doc_pos < doc_tokens.len() {
+                    Some(
+                        (0..self.num_terms)
+                            .map(|i| doc_tokens[first_doc_pos + i])
+                            .collect(),
+                    )
+                } else {
+                    None
+                }
+            };
+            let token_offsets = match token_offsets {
+                Some(o) => o,
+                None => continue,
+            };
 
             let mut total_distance: u32 = 0;
 
@@ -268,15 +316,16 @@ impl<TPostings: Postings> ContainsScorer<TPostings> {
             // Validate separators between consecutive tokens
             let mut valid = true;
             for (sep_idx, query_sep) in self.query_separators.iter().enumerate() {
-                let pos_i = first_doc_pos + sep_idx;
-                let pos_next = first_doc_pos + sep_idx + 1;
-                if pos_next >= doc_tokens.len() {
+                let (_, end_i) = token_offsets[sep_idx];
+                let (start_next, _) = token_offsets[sep_idx + 1];
+                if end_i > stored_text.len()
+                    || start_next > stored_text.len()
+                    || end_i > start_next
+                {
                     valid = false;
                     break;
                 }
-                let doc_sep_start = doc_tokens[pos_i].1;
-                let doc_sep_end = doc_tokens[pos_next].0;
-                let doc_sep = &stored_text[doc_sep_start..doc_sep_end];
+                let doc_sep = &stored_text[end_i..start_next];
                 if self.strict_separators {
                     total_distance += edit_distance(query_sep, doc_sep);
                     if total_distance > self.distance_budget {
@@ -299,21 +348,21 @@ impl<TPostings: Postings> ContainsScorer<TPostings> {
 
             // Validate prefix (chars before first token)
             if !self.query_prefix.is_empty() {
-                let first_token_start = doc_tokens[first_doc_pos].0;
+                let (first_start, _) = token_offsets[0];
                 if self.strict_separators {
                     let prefix_len = self.query_prefix.len();
-                    let doc_prefix_start = first_token_start.saturating_sub(prefix_len);
-                    let doc_prefix = &stored_text[doc_prefix_start..first_token_start];
+                    let doc_prefix_start = first_start.saturating_sub(prefix_len);
+                    let doc_prefix = &stored_text[doc_prefix_start..first_start];
                     total_distance += edit_distance(&self.query_prefix, doc_prefix);
                     if total_distance > self.distance_budget {
                         continue;
                     }
                 } else {
                     // Relaxed: check that at least one non-alnum char exists before token
-                    if first_token_start == 0 {
+                    if first_start == 0 {
                         continue;
                     }
-                    let before = &stored_text[..first_token_start];
+                    let before = &stored_text[..first_start];
                     if before.as_bytes().last().is_none_or(|b| b.is_ascii_alphanumeric()) {
                         continue;
                     }
@@ -322,21 +371,21 @@ impl<TPostings: Postings> ContainsScorer<TPostings> {
 
             // Validate suffix (chars after last token)
             if !self.query_suffix.is_empty() {
-                let last_token_end = doc_tokens[last_doc_pos].1;
+                let (_, last_end) = token_offsets[token_offsets.len() - 1];
                 if self.strict_separators {
                     let suffix_len = self.query_suffix.len();
-                    let doc_suffix_end = min(last_token_end + suffix_len, stored_text.len());
-                    let doc_suffix = &stored_text[last_token_end..doc_suffix_end];
+                    let doc_suffix_end = min(last_end + suffix_len, stored_text.len());
+                    let doc_suffix = &stored_text[last_end..doc_suffix_end];
                     total_distance += edit_distance(&self.query_suffix, doc_suffix);
                     if total_distance > self.distance_budget {
                         continue;
                     }
                 } else {
                     // Relaxed: check that at least one non-alnum char exists after token
-                    if last_token_end >= stored_text.len() {
+                    if last_end >= stored_text.len() {
                         continue;
                     }
-                    let after_byte = stored_text.as_bytes()[last_token_end];
+                    let after_byte = stored_text.as_bytes()[last_end];
                     if after_byte.is_ascii_alphanumeric() {
                         continue;
                     }

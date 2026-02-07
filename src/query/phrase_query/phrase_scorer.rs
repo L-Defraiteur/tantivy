@@ -24,12 +24,9 @@ impl<TPostings: Postings> PostingsWithOffset<TPostings> {
         self.postings.positions_with_offset(self.offset, output)
     }
 
-    pub fn offsets(&mut self, output: &mut Vec<(u32, u32)>) {
-        self.postings.offsets(output)
-    }
-
-    pub fn append_offsets(&mut self, output: &mut Vec<(u32, u32)>) {
-        self.postings.append_offsets(output)
+    pub fn positions_and_offsets(&mut self, output: &mut Vec<(u32, u32, u32)>) {
+        output.clear();
+        self.postings.append_positions_and_offsets(self.offset, output);
     }
 }
 

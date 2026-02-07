@@ -121,6 +121,18 @@ impl Postings for LoadedPostings {
         let end = self.offset_offsets[self.cursor + 1] as usize;
         output.extend_from_slice(&self.byte_offsets[start..end]);
     }
+
+    fn append_positions_and_offsets(&mut self, offset: u32, output: &mut Vec<(u32, u32, u32)>) {
+        let pos_start = self.position_offsets[self.cursor] as usize;
+        let pos_end = self.position_offsets[self.cursor + 1] as usize;
+        let off_start = self.offset_offsets[self.cursor] as usize;
+        let positions = &self.positions[pos_start..pos_end];
+        let offsets = &self.byte_offsets[off_start..];
+        for (i, &pos) in positions.iter().enumerate() {
+            let (from, to) = offsets.get(i).copied().unwrap_or((0, 0));
+            output.push((pos + offset, from, to));
+        }
+    }
 }
 
 #[cfg(test)]

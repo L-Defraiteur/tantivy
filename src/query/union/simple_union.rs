@@ -77,6 +77,25 @@ impl<TDocSet: Postings> Postings for SimpleUnion<TDocSet> {
         output.sort_unstable_by_key(|&(from, _)| from);
         output.dedup();
     }
+
+    fn append_positions_and_offsets(&mut self, offset: u32, output: &mut Vec<(u32, u32, u32)>) {
+        let base = output.len();
+        for docset in &mut self.docsets {
+            if docset.doc() == self.doc {
+                docset.append_positions_and_offsets(offset, output);
+            }
+        }
+        output[base..].sort_unstable_by_key(|&(pos, _, _)| pos);
+        // Dedup by position (slice doesn't have dedup_by_key)
+        let mut write = base;
+        for read in base..output.len() {
+            if write == base || output[read].0 != output[write - 1].0 {
+                output[write] = output[read];
+                write += 1;
+            }
+        }
+        output.truncate(write);
+    }
 }
 
 impl<TDocSet: DocSet> DocSet for SimpleUnion<TDocSet> {

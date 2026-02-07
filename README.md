@@ -32,12 +32,12 @@ For multi-token queries (`"std::collections"`, `"os.path.join"`), the `PhraseSco
 
 A custom scorer that validates non-alphanumeric characters (separators) between query tokens match those in the document. This is what allows `c++` to match only documents containing `c++` and not every occurrence of the word "c".
 
-**How it works:**
-- Loads the stored text of the document
-- Re-tokenizes to obtain byte offsets of each token
-- Extracts actual separators (text between `offset_to[token_i]` and `offset_from[token_i+1]`)
+**How it works (multi-token):**
+- Reads byte offsets directly from the postings index via `append_positions_and_offsets()` — no re-tokenization needed
+- Extracts actual separators from stored text (text between `offset_to[token_i]` and `offset_from[token_i+1]`)
 - Compares with query separators via edit distance (Levenshtein)
 - Global cumulative distance budget: the sum of fuzzy distances from tokens + separator distances must stay within budget
+- Falls back to re-tokenization if the field was indexed without offsets (`WithFreqsAndPositions`)
 
 **Two validation modes:**
 - `strict_separators: true` (default) — separators must match exactly (within edit distance budget). `c++` does not match `c--` (distance 2 > budget 1)
@@ -96,11 +96,12 @@ InvertedIndexReader::read_postings_from_terminfo()
 ```
 
 **Propagation through unions:**
-- `SegmentPostings::append_offsets()` — reads from PositionReader
-- `LoadedPostings::append_offsets()` — from offsets loaded in memory
-- `SimpleUnion::append_offsets()` — merge + sort + dedup of offsets from all docsets
-- `BitSetPostingUnion::append_offsets()` — same
-- `PostingsWithOffset::append_offsets()` — delegation (byte offsets are absolute)
+- `SegmentPostings` — reads from PositionReader
+- `LoadedPostings` — from offsets loaded in memory
+- `SimpleUnion` / `BitSetPostingUnion` — merge + sort + dedup from all docsets
+- `PostingsWithOffset::positions_and_offsets()` — delegates with position offset, byte offsets stay absolute
+
+**Joint method** `append_positions_and_offsets(offset, output)` on the `Postings` trait returns `(position, byte_from, byte_to)` tuples, keeping positions and byte offsets correlated through unions (unlike separate `append_positions_with_offset` + `append_offsets` which sort/dedup independently).
 
 **21 files modified** across `src/schema/`, `src/postings/`, `src/index/`, `src/termdict/`, `src/query/`.
 

@@ -8,16 +8,13 @@ use super::regex_phrase_weight::RegexPhraseWeight;
 use super::PhraseScorer;
 use crate::fieldnorm::FieldNormReader;
 use crate::index::SegmentReader;
-use crate::postings::{Postings, TermInfo};
+use crate::postings::TermInfo;
 use crate::query::bm25::Bm25Weight;
 use crate::query::explanation::does_not_match;
 use crate::query::fuzzy_query::DfaWrapper;
-use crate::query::union::SimpleUnion;
 use crate::query::{BitSetDocSet, ConstScorer, EmptyScorer, Explanation, Scorer, Weight};
 use crate::schema::{Field, IndexRecordOption, Term};
 use crate::{DocId, InvertedIndexReader, Score};
-
-type UnionType = SimpleUnion<Box<dyn Postings + 'static>>;
 
 /// Cascade level returned by cascade_term_infos.
 #[derive(Debug, Clone, Copy)]

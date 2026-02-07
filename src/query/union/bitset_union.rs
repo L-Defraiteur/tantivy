@@ -79,6 +79,30 @@ impl<TDocSet: Postings> Postings for BitSetPostingUnion<TDocSet> {
         output.sort_unstable_by_key(|&(from, _)| from);
         output.dedup();
     }
+
+    fn append_positions_and_offsets(&mut self, offset: u32, output: &mut Vec<(u32, u32, u32)>) {
+        let base = output.len();
+        let curr_doc = self.bitset.doc();
+        let mut docsets = self.docsets.borrow_mut();
+        for docset in docsets.iter_mut() {
+            if docset.doc() < curr_doc {
+                docset.seek(curr_doc);
+            }
+            if docset.doc() == curr_doc {
+                docset.append_positions_and_offsets(offset, output);
+            }
+        }
+        output[base..].sort_unstable_by_key(|&(pos, _, _)| pos);
+        // Dedup by position (slice doesn't have dedup_by_key)
+        let mut write = base;
+        for read in base..output.len() {
+            if write == base || output[read].0 != output[write - 1].0 {
+                output[write] = output[read];
+                write += 1;
+            }
+        }
+        output.truncate(write);
+    }
 }
 
 impl<TDocSet: DocSet> DocSet for BitSetPostingUnion<TDocSet> {
