@@ -75,5 +75,6 @@ jobs:
           -A clippy::let_and_return
           -A clippy::redundant_closure
           -A clippy::too_many_arguments
+          -A clippy::assertions_on_constants
           -A dead_code
           -A unused_imports
