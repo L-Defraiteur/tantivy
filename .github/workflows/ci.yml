@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        features:
+          - label: "default"
+            flags: "mmap,stopwords,lz4-compression,stemmer"
+          - label: "all"
+            flags: "mmap,stopwords,lz4-compression,zstd-compression,failpoints,stemmer"
+          - label: "minimal"
+            flags: ""
+
+    name: test-${{ matrix.features.label }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        run: |
+          if [ -z "${{ matrix.features.flags }}" ]; then
+            cargo build --lib --no-default-features
+          else
+            cargo build --features ${{ matrix.features.flags }} --no-default-features
+          fi
+
+      - name: Run lib tests
+        run: |
+          if [ -z "${{ matrix.features.flags }}" ]; then
+            cargo test --lib --no-default-features
+          else
+            cargo test --lib --features ${{ matrix.features.flags }} --no-default-features
+          fi
+
+  clippy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Clippy
+        run: cargo clippy --features mmap,stopwords,lz4-compression,stemmer --no-default-features -- -D warnings
