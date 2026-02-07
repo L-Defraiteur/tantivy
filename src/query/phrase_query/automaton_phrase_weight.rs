@@ -12,6 +12,7 @@ use crate::postings::TermInfo;
 use crate::query::bm25::Bm25Weight;
 use crate::query::explanation::does_not_match;
 use crate::query::fuzzy_query::DfaWrapper;
+use crate::query::fuzzy_substring_automaton::FuzzySubstringAutomaton;
 use crate::query::{BitSetDocSet, ConstScorer, EmptyScorer, Explanation, Scorer, Weight};
 use crate::schema::{Field, IndexRecordOption, Term};
 use crate::{DocId, InvertedIndexReader, Score};
@@ -22,6 +23,7 @@ pub(crate) enum CascadeLevel {
     Exact,
     Fuzzy(u8),
     Substring,
+    FuzzySubstring(u8),
 }
 
 impl CascadeLevel {
@@ -30,12 +32,13 @@ impl CascadeLevel {
             CascadeLevel::Exact => 0,
             CascadeLevel::Fuzzy(d) => *d as u32,
             CascadeLevel::Substring => 0,
+            CascadeLevel::FuzzySubstring(d) => *d as u32,
         }
     }
 }
 
 /// Weight for `AutomatonPhraseQuery`. Implements the auto-cascade
-/// (exact → fuzzy → substring) per position, then delegates to
+/// (exact → fuzzy → substring → fuzzy substring) per position, then delegates to
 /// `ContainsScorer` (with separator validation) or `PhraseScorer` for multi-token,
 /// or a `ConstScorer`/`ContainsSingleScorer` for single-token.
 pub struct AutomatonPhraseWeight {
@@ -98,7 +101,7 @@ impl AutomatonPhraseWeight {
         Ok(FieldNormReader::constant(reader.max_doc(), 1))
     }
 
-    /// Auto-cascade for a single token: exact → fuzzy → substring.
+    /// Auto-cascade for a single token: exact → fuzzy → substring → fuzzy substring.
     /// Returns (term_infos, cascade_level) from the first level that finds matches.
     fn cascade_term_infos(
         &self,
@@ -113,13 +116,15 @@ impl AutomatonPhraseWeight {
 
         let term_dict = inverted_index.terms();
 
+        // Cached LevenshteinAutomatonBuilder (shared between Fuzzy and FuzzySubstring).
+        static AUTOMATON_BUILDER: [[OnceCell<LevenshteinAutomatonBuilder>; 2]; 3] = [
+            [OnceCell::new(), OnceCell::new()],
+            [OnceCell::new(), OnceCell::new()],
+            [OnceCell::new(), OnceCell::new()],
+        ];
+
         // 2. FUZZY: Levenshtein DFA (if enabled and distance ≤ 2)
         if self.fuzzy_distance > 0 && self.fuzzy_distance <= 2 {
-            static AUTOMATON_BUILDER: [[OnceCell<LevenshteinAutomatonBuilder>; 2]; 3] = [
-                [OnceCell::new(), OnceCell::new()],
-                [OnceCell::new(), OnceCell::new()],
-                [OnceCell::new(), OnceCell::new()],
-            ];
             let builder = AUTOMATON_BUILDER[self.fuzzy_distance as usize][1]
                 .get_or_init(|| {
                     LevenshteinAutomatonBuilder::new(self.fuzzy_distance, true)
@@ -146,7 +151,30 @@ impl AutomatonPhraseWeight {
         while stream.advance() {
             term_infos.push(stream.value().clone());
         }
-        Ok((term_infos, CascadeLevel::Substring))
+        if !term_infos.is_empty() {
+            return Ok((term_infos, CascadeLevel::Substring));
+        }
+
+        // 4. FUZZY SUBSTRING: NFA simulation .*{levenshtein(token, d)}.*
+        if self.fuzzy_distance > 0 && self.fuzzy_distance <= 2 {
+            let builder = AUTOMATON_BUILDER[self.fuzzy_distance as usize][1]
+                .get_or_init(|| {
+                    LevenshteinAutomatonBuilder::new(self.fuzzy_distance, true)
+                });
+            let dfa = builder.build_dfa(token);
+            let automaton = FuzzySubstringAutomaton::new(dfa);
+            let mut stream = term_dict.search(&automaton).into_stream()?;
+            let mut term_infos = Vec::new();
+            while stream.advance() {
+                term_infos.push(stream.value().clone());
+            }
+            if !term_infos.is_empty() {
+                return Ok((term_infos, CascadeLevel::FuzzySubstring(self.fuzzy_distance)));
+            }
+        }
+
+        // No matches at any level
+        Ok((Vec::new(), CascadeLevel::Substring))
     }
 
     /// Multi-token: cascade per position, then ContainsScorer or PhraseScorer.
@@ -386,6 +414,42 @@ mod tests {
         assert_eq!(scorer.doc(), 0);
         assert_eq!(scorer.advance(), 2);
         assert_eq!(scorer.advance(), TERMINATED);
+        Ok(())
+    }
+
+    #[test]
+    fn test_automaton_phrase_fuzzy_substring() -> crate::Result<()> {
+        // "progam" (typo for "program") at d=1:
+        // - Exact: "progam" not in dict
+        // - Fuzzy d=1: "programming" is too far (distance >> 1)
+        // - Substring: ".*progam.*" → no term contains "progam" literally
+        // - FuzzySubstring: "programming" contains "program" (distance 1 from "progam") → match!
+        let index = create_index(&["programming language", "foo bar"])?;
+        let schema = index.schema();
+        let text_field = schema.get_field("text").unwrap();
+        let searcher = index.reader()?.searcher();
+        let query =
+            AutomatonPhraseQuery::new(text_field, vec![(0, "progam".into())], 1000, 1);
+        let weight = query
+            .automaton_phrase_weight(EnableScoring::disabled_from_schema(searcher.schema()))?;
+        let mut scorer = weight.scorer(searcher.segment_reader(0), 1.0)?;
+        assert_eq!(scorer.doc(), 0);
+        assert_eq!(scorer.advance(), TERMINATED);
+        Ok(())
+    }
+
+    #[test]
+    fn test_fuzzy_substring_no_false_positive() -> crate::Result<()> {
+        // "xyz" at d=1 should not match "programming" (no substring within distance 1)
+        let index = create_index(&["programming language", "foo bar"])?;
+        let schema = index.schema();
+        let text_field = schema.get_field("text").unwrap();
+        let searcher = index.reader()?.searcher();
+        let query = AutomatonPhraseQuery::new(text_field, vec![(0, "xyz".into())], 1000, 1);
+        let weight = query
+            .automaton_phrase_weight(EnableScoring::disabled_from_schema(searcher.schema()))?;
+        let mut scorer = weight.scorer(searcher.segment_reader(0), 1.0)?;
+        assert_eq!(scorer.doc(), TERMINATED);
         Ok(())
     }
 

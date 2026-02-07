@@ -12,6 +12,7 @@ mod exclude;
 mod exist_query;
 mod explanation;
 mod fuzzy_query;
+mod fuzzy_substring_automaton;
 mod intersection;
 mod more_like_this;
 mod phrase_prefix_query;
