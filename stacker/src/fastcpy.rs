@@ -9,10 +9,7 @@ pub fn fast_short_slice_copy(src: &[u8], dst: &mut [u8]) {
     #[cold]
     #[track_caller]
     fn len_mismatch_fail(dst_len: usize, src_len: usize) -> ! {
-        panic!(
-            "source slice length ({}) does not match destination slice length ({})",
-            src_len, dst_len,
-        );
+        panic!("source slice length ({src_len}) does not match destination slice length ({dst_len})");
     }
 
     if src.len() != dst.len() {

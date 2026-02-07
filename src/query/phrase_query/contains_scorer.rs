@@ -314,7 +314,7 @@ impl<TPostings: Postings> ContainsScorer<TPostings> {
                         continue;
                     }
                     let before = &stored_text[..first_token_start];
-                    if !before.bytes().rev().next().map_or(false, |b| !b.is_ascii_alphanumeric()) {
+                    if before.as_bytes().last().is_none_or(|b| b.is_ascii_alphanumeric()) {
                         continue;
                     }
                 }
@@ -463,7 +463,7 @@ impl ContainsSingleScorer {
         let token_lower = self.token.to_lowercase();
 
         // Find all occurrences of this token (or fuzzy/substring matches) in the doc
-        for (pos, &(start, end)) in doc_tokens.iter().enumerate() {
+        for &(start, end) in &doc_tokens {
             let doc_token = stored_text[start..end].to_lowercase();
             // Check if this token could match (exact, fuzzy, or substring)
             let is_match = doc_token == token_lower

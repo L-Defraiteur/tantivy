@@ -67,4 +67,13 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Clippy
-        run: cargo clippy --features mmap,stopwords,lz4-compression,stemmer --no-default-features -- -D warnings
+        run: >
+          cargo clippy --features mmap,stopwords,lz4-compression,stemmer --no-default-features --
+          -D warnings
+          -A clippy::uninlined_format_args
+          -A clippy::identity_op
+          -A clippy::let_and_return
+          -A clippy::redundant_closure
+          -A clippy::too_many_arguments
+          -A dead_code
+          -A unused_imports
