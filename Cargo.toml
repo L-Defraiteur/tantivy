@@ -149,6 +149,7 @@ members = [
     "sstable",
     "tokenizer-api",
     "columnar",
+    "tantivy_fts/rust",
 ]
 
 # Following the "fail" crate best practises, we isolate
