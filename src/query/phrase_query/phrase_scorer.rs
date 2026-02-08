@@ -1,9 +1,11 @@
 use std::cmp::Ordering;
+use std::sync::Arc;
 
 use crate::docset::{DocSet, TERMINATED};
 use crate::fieldnorm::FieldNormReader;
 use crate::postings::Postings;
 use crate::query::bm25::Bm25Weight;
+use crate::query::phrase_query::scoring_utils::HighlightSink;
 use crate::query::{Intersection, Scorer};
 use crate::{DocId, Score};
 
@@ -60,6 +62,8 @@ pub struct PhraseScorer<TPostings: Postings> {
     left_slops: Vec<u8>,
     positions_buffer: Vec<u32>,
     slops_buffer: Vec<u8>,
+    highlight_sink: Option<Arc<HighlightSink>>,
+    segment_ord: u32,
 }
 
 /// Returns true if and only if the two sorted arrays contain a common element
@@ -357,13 +361,7 @@ impl<TPostings: Postings> PhraseScorer<TPostings> {
         fieldnorm_reader: FieldNormReader,
         slop: u32,
     ) -> PhraseScorer<TPostings> {
-        Self::new_with_offset(
-            term_postings,
-            similarity_weight_opt,
-            fieldnorm_reader,
-            slop,
-            0,
-        )
+        Self::build(term_postings, similarity_weight_opt, fieldnorm_reader, slop, 0, None, 0)
     }
 
     pub(crate) fn new_with_offset(
@@ -372,6 +370,45 @@ impl<TPostings: Postings> PhraseScorer<TPostings> {
         fieldnorm_reader: FieldNormReader,
         slop: u32,
         offset: usize,
+    ) -> PhraseScorer<TPostings> {
+        Self::build(
+            term_postings_with_offset,
+            similarity_weight_opt,
+            fieldnorm_reader,
+            slop,
+            offset,
+            None,
+            0,
+        )
+    }
+
+    pub(crate) fn new_with_highlight(
+        term_postings: Vec<(usize, TPostings)>,
+        similarity_weight_opt: Option<Bm25Weight>,
+        fieldnorm_reader: FieldNormReader,
+        slop: u32,
+        highlight_sink: Arc<HighlightSink>,
+        segment_ord: u32,
+    ) -> PhraseScorer<TPostings> {
+        Self::build(
+            term_postings,
+            similarity_weight_opt,
+            fieldnorm_reader,
+            slop,
+            0,
+            Some(highlight_sink),
+            segment_ord,
+        )
+    }
+
+    fn build(
+        term_postings_with_offset: Vec<(usize, TPostings)>,
+        similarity_weight_opt: Option<Bm25Weight>,
+        fieldnorm_reader: FieldNormReader,
+        slop: u32,
+        offset: usize,
+        highlight_sink: Option<Arc<HighlightSink>>,
+        segment_ord: u32,
     ) -> PhraseScorer<TPostings> {
         let num_docs = fieldnorm_reader.num_docs();
         let max_offset = term_postings_with_offset
@@ -400,9 +437,17 @@ impl<TPostings: Postings> PhraseScorer<TPostings> {
             left_slops: Vec::with_capacity(100),
             slops_buffer: Vec::with_capacity(100),
             positions_buffer: Vec::with_capacity(100),
+            highlight_sink,
+            segment_ord,
         };
-        if scorer.doc() != TERMINATED && !scorer.phrase_match() {
-            scorer.advance();
+        if scorer.doc() != TERMINATED {
+            let matched = scorer.phrase_match();
+            if scorer.highlight_sink.is_some() {
+                scorer.drain_or_capture_offsets(matched);
+            }
+            if !matched {
+                scorer.advance();
+            }
         }
         scorer
     }
@@ -514,13 +559,46 @@ impl<TPostings: Postings> PhraseScorer<TPostings> {
     fn has_slop(&self) -> bool {
         self.slop > 0
     }
+
+    /// Drain offsets from all terms' postings to keep the offsets reader in sync
+    /// with the positions reader. If `matched` is true, capture offsets into the sink.
+    fn drain_or_capture_offsets(&mut self, matched: bool) {
+        let doc = self.doc();
+        let mut all_offsets = Vec::new();
+        for i in 0..self.num_terms {
+            let mut buf = Vec::new();
+            self.intersection_docset
+                .docset_mut_specialized(i)
+                .postings
+                .append_offsets(&mut buf);
+            if matched {
+                for (from, to) in buf {
+                    all_offsets.push([from as usize, to as usize]);
+                }
+            }
+        }
+        if matched && !all_offsets.is_empty() {
+            if let Some(ref sink) = self.highlight_sink {
+                all_offsets.sort();
+                all_offsets.dedup();
+                sink.insert(self.segment_ord, doc, all_offsets);
+            }
+        }
+    }
 }
 
 impl<TPostings: Postings> DocSet for PhraseScorer<TPostings> {
     fn advance(&mut self) -> DocId {
         loop {
             let doc = self.intersection_docset.advance();
-            if doc == TERMINATED || self.phrase_match() {
+            if doc == TERMINATED {
+                return doc;
+            }
+            let matched = self.phrase_match();
+            if self.highlight_sink.is_some() {
+                self.drain_or_capture_offsets(matched);
+            }
+            if matched {
                 return doc;
             }
         }
@@ -529,7 +607,14 @@ impl<TPostings: Postings> DocSet for PhraseScorer<TPostings> {
     fn seek(&mut self, target: DocId) -> DocId {
         debug_assert!(target >= self.doc());
         let doc = self.intersection_docset.seek(target);
-        if doc == TERMINATED || self.phrase_match() {
+        if doc == TERMINATED {
+            return doc;
+        }
+        let matched = self.phrase_match();
+        if self.highlight_sink.is_some() {
+            self.drain_or_capture_offsets(matched);
+        }
+        if matched {
             return doc;
         }
         self.advance()
@@ -537,8 +622,12 @@ impl<TPostings: Postings> DocSet for PhraseScorer<TPostings> {
 
     fn seek_into_the_danger_zone(&mut self, target: DocId) -> bool {
         debug_assert!(target >= self.doc());
-        if self.intersection_docset.seek_into_the_danger_zone(target) && self.phrase_match() {
-            return true;
+        if self.intersection_docset.seek_into_the_danger_zone(target) {
+            let matched = self.phrase_match();
+            if self.highlight_sink.is_some() {
+                self.drain_or_capture_offsets(matched);
+            }
+            return matched;
         }
         false
     }

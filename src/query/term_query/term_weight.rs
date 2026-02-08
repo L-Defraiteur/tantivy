@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use super::term_scorer::TermScorer;
 use crate::docset::{DocSet, COLLECT_BLOCK_BUFFER_LEN};
 use crate::fieldnorm::FieldNormReader;
@@ -5,6 +7,7 @@ use crate::index::SegmentReader;
 use crate::postings::SegmentPostings;
 use crate::query::bm25::Bm25Weight;
 use crate::query::explanation::does_not_match;
+use crate::query::phrase_query::scoring_utils::HighlightSink;
 use crate::query::weight::{for_each_docset_buffered, for_each_scorer};
 use crate::query::{AllScorer, AllWeight, EmptyScorer, Explanation, Scorer, Weight};
 use crate::schema::IndexRecordOption;
@@ -15,6 +18,7 @@ pub struct TermWeight {
     index_record_option: IndexRecordOption,
     similarity_weight: Bm25Weight,
     scoring_enabled: bool,
+    highlight_sink: Option<Arc<HighlightSink>>,
 }
 
 enum TermOrEmptyOrAllScorer {
@@ -238,7 +242,13 @@ impl TermWeight {
             index_record_option,
             similarity_weight,
             scoring_enabled,
+            highlight_sink: None,
         }
+    }
+
+    pub fn with_highlight_sink(mut self, sink: Arc<HighlightSink>) -> Self {
+        self.highlight_sink = Some(sink);
+        self
     }
 
     pub fn term(&self) -> &Term {
@@ -269,26 +279,43 @@ impl TermWeight {
         let field = self.term.field();
         let inverted_index = reader.inverted_index(field)?;
         let Some(term_info) = inverted_index.get_term_info(&self.term)? else {
-            // The term was not found.
+            // The term was not found — still advance the sink counter to stay in
+            // sync with the real segment ordinals used by TopDocs.
+            if let Some(ref sink) = self.highlight_sink {
+                sink.next_segment();
+            }
             return Ok(TermOrEmptyOrAllScorer::Empty);
         };
 
         // If we don't care about scores, and our posting lists matches all doc, we can return the
         // AllMatch scorer.
         if !self.scoring_enabled && term_info.doc_freq == reader.max_doc() {
+            if let Some(ref sink) = self.highlight_sink {
+                sink.next_segment();
+            }
             return Ok(TermOrEmptyOrAllScorer::AllMatch(AllScorer::new(
                 reader.max_doc(),
             )));
         }
 
+        // When highlighting, force reading offsets from the posting list.
+        let record_option = if self.highlight_sink.is_some() {
+            IndexRecordOption::WithFreqsAndPositionsAndOffsets
+        } else {
+            self.index_record_option
+        };
+
         let segment_postings: SegmentPostings =
-            inverted_index.read_postings_from_terminfo(&term_info, self.index_record_option)?;
+            inverted_index.read_postings_from_terminfo(&term_info, record_option)?;
 
         let fieldnorm_reader = self.fieldnorm_reader(reader)?;
         let similarity_weight = self.similarity_weight.boost_by(boost);
-        Ok(TermOrEmptyOrAllScorer::TermScorer(Box::new(
-            TermScorer::new(segment_postings, fieldnorm_reader, similarity_weight),
-        )))
+        let mut scorer = TermScorer::new(segment_postings, fieldnorm_reader, similarity_weight);
+        if let Some(ref sink) = self.highlight_sink {
+            let segment_ord = sink.next_segment();
+            scorer = scorer.with_highlight_sink(Arc::clone(sink), segment_ord);
+        }
+        Ok(TermOrEmptyOrAllScorer::TermScorer(Box::new(scorer)))
     }
 
     fn fieldnorm_reader(&self, segment_reader: &SegmentReader) -> crate::Result<FieldNormReader> {

@@ -1,5 +1,8 @@
+use std::sync::Arc;
+
 use super::PhraseWeight;
 use crate::query::bm25::Bm25Weight;
+use crate::query::phrase_query::scoring_utils::HighlightSink;
 use crate::query::{EnableScoring, Query, Weight};
 use crate::schema::{Field, IndexRecordOption, Term};
 
@@ -24,6 +27,7 @@ pub struct PhraseQuery {
     field: Field,
     phrase_terms: Vec<(usize, Term)>,
     slop: u32,
+    highlight_sink: Option<Arc<HighlightSink>>,
 }
 
 impl PhraseQuery {
@@ -60,7 +64,13 @@ impl PhraseQuery {
             field,
             phrase_terms: terms,
             slop,
+            highlight_sink: None,
         }
+    }
+
+    pub fn with_highlight_sink(mut self, sink: Arc<HighlightSink>) -> Self {
+        self.highlight_sink = Some(sink);
+        self
     }
 
     /// Slop allowed for the phrase.
@@ -127,6 +137,9 @@ impl PhraseQuery {
         let mut weight = PhraseWeight::new(self.phrase_terms.clone(), bm25_weight_opt);
         if self.slop > 0 {
             weight.slop(self.slop);
+        }
+        if let Some(ref sink) = self.highlight_sink {
+            weight = weight.with_highlight_sink(Arc::clone(sink));
         }
         Ok(weight)
     }

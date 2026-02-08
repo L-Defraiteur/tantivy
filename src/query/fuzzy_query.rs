@@ -1,7 +1,10 @@
+use std::sync::Arc;
+
 use levenshtein_automata::{Distance, LevenshteinAutomatonBuilder, DFA};
 use once_cell::sync::OnceCell;
 use tantivy_fst::Automaton;
 
+use crate::query::phrase_query::scoring_utils::HighlightSink;
 use crate::query::{AutomatonWeight, EnableScoring, Query, Weight};
 use crate::schema::{Term, Type};
 use crate::TantivyError::InvalidArgument;
@@ -76,7 +79,7 @@ impl Automaton for DfaWrapper {
 /// }
 /// # assert!(example().is_ok());
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct FuzzyTermQuery {
     /// What term are we searching
     term: Term,
@@ -86,6 +89,18 @@ pub struct FuzzyTermQuery {
     transposition_cost_one: bool,
     /// is a starts with query
     prefix: bool,
+    highlight_sink: Option<Arc<HighlightSink>>,
+}
+
+impl std::fmt::Debug for FuzzyTermQuery {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.debug_struct("FuzzyTermQuery")
+            .field("term", &self.term)
+            .field("distance", &self.distance)
+            .field("transposition_cost_one", &self.transposition_cost_one)
+            .field("prefix", &self.prefix)
+            .finish()
+    }
 }
 
 impl FuzzyTermQuery {
@@ -96,6 +111,7 @@ impl FuzzyTermQuery {
             distance,
             transposition_cost_one,
             prefix: false,
+            highlight_sink: None,
         }
     }
 
@@ -106,7 +122,13 @@ impl FuzzyTermQuery {
             distance,
             transposition_cost_one,
             prefix: true,
+            highlight_sink: None,
         }
+    }
+
+    pub fn with_highlight_sink(mut self, sink: Arc<HighlightSink>) -> Self {
+        self.highlight_sink = Some(sink);
+        self
     }
 
     fn specialized_weight(&self) -> crate::Result<AutomatonWeight<DfaWrapper>> {
@@ -159,18 +181,22 @@ impl FuzzyTermQuery {
             automaton_builder.build_dfa(term_text)
         };
 
-        if let Some((json_path_bytes, _)) = term_value.as_json() {
-            Ok(AutomatonWeight::new_for_json_path(
+        let mut weight = if let Some((json_path_bytes, _)) = term_value.as_json() {
+            AutomatonWeight::new_for_json_path(
                 self.term.field(),
                 DfaWrapper(automaton),
                 json_path_bytes,
-            ))
+            )
         } else {
-            Ok(AutomatonWeight::new(
+            AutomatonWeight::new(
                 self.term.field(),
                 DfaWrapper(automaton),
-            ))
+            )
+        };
+        if let Some(ref sink) = self.highlight_sink {
+            weight = weight.with_highlight_sink(Arc::clone(sink));
         }
+        Ok(weight)
     }
 }
 

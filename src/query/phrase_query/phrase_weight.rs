@@ -1,9 +1,12 @@
+use std::sync::Arc;
+
 use super::PhraseScorer;
 use crate::fieldnorm::FieldNormReader;
 use crate::index::SegmentReader;
 use crate::postings::SegmentPostings;
 use crate::query::bm25::Bm25Weight;
 use crate::query::explanation::does_not_match;
+use crate::query::phrase_query::scoring_utils::HighlightSink;
 use crate::query::{EmptyScorer, Explanation, Scorer, Weight};
 use crate::schema::{IndexRecordOption, Term};
 use crate::{DocId, DocSet, Score};
@@ -12,6 +15,7 @@ pub struct PhraseWeight {
     phrase_terms: Vec<(usize, Term)>,
     similarity_weight_opt: Option<Bm25Weight>,
     slop: u32,
+    highlight_sink: Option<Arc<HighlightSink>>,
 }
 
 impl PhraseWeight {
@@ -26,7 +30,13 @@ impl PhraseWeight {
             phrase_terms,
             similarity_weight_opt,
             slop,
+            highlight_sink: None,
         }
+    }
+
+    pub fn with_highlight_sink(mut self, sink: Arc<HighlightSink>) -> Self {
+        self.highlight_sink = Some(sink);
+        self
     }
 
     fn fieldnorm_reader(&self, reader: &SegmentReader) -> crate::Result<FieldNormReader> {
@@ -49,23 +59,45 @@ impl PhraseWeight {
             .as_ref()
             .map(|similarity_weight| similarity_weight.boost_by(boost));
         let fieldnorm_reader = self.fieldnorm_reader(reader)?;
+        let record_option = if self.highlight_sink.is_some() {
+            IndexRecordOption::WithFreqsAndPositionsAndOffsets
+        } else {
+            IndexRecordOption::WithFreqsAndPositions
+        };
         let mut term_postings_list = Vec::new();
         for &(offset, ref term) in &self.phrase_terms {
             if let Some(postings) = reader
                 .inverted_index(term.field())?
-                .read_postings(term, IndexRecordOption::WithFreqsAndPositions)?
+                .read_postings(term, record_option)?
             {
                 term_postings_list.push((offset, postings));
             } else {
+                // Term not found in this segment — still advance the sink counter
+                // to stay in sync with the real segment ordinals used by TopDocs.
+                if let Some(ref sink) = self.highlight_sink {
+                    sink.next_segment();
+                }
                 return Ok(None);
             }
         }
-        Ok(Some(PhraseScorer::new(
-            term_postings_list,
-            similarity_weight_opt,
-            fieldnorm_reader,
-            self.slop,
-        )))
+        if let Some(ref sink) = self.highlight_sink {
+            let segment_ord = sink.next_segment();
+            Ok(Some(PhraseScorer::new_with_highlight(
+                term_postings_list,
+                similarity_weight_opt,
+                fieldnorm_reader,
+                self.slop,
+                Arc::clone(sink),
+                segment_ord,
+            )))
+        } else {
+            Ok(Some(PhraseScorer::new(
+                term_postings_list,
+                similarity_weight_opt,
+                fieldnorm_reader,
+                self.slop,
+            )))
+        }
     }
 
     pub fn slop(&mut self, slop: u32) {

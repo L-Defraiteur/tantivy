@@ -10,7 +10,7 @@ quickwit-oss/tantivy v0.22
 
 ## Changes from upstream
 
-**39 files changed, +1873 lines, -59 lines** compared to `izihawa/tantivy@main`.
+**48 files changed** compared to `izihawa/tantivy@main`.
 
 ### 1. ContainsQuery — multi-strategy search with auto-cascade
 
@@ -75,7 +75,7 @@ A fast alternative to AutomatonPhraseQuery that uses a trigram (ngram) index for
 
 **File:** `src/query/phrase_query/ngram_contains_query.rs` — Query, Weight, Scorer with trigram candidate filtering
 
-### 4. HighlightSink — side-channel byte offset capture
+### 4. HighlightSink — side-channel byte offset capture for all query types
 
 A thread-safe sink for capturing byte offsets during scoring, used by the FFI layer to return highlight ranges without re-tokenization.
 
@@ -89,12 +89,34 @@ pub struct HighlightSink {
 **How it works:**
 - Shared via `Arc<HighlightSink>` between the caller and scorers
 - Each `Weight::scorer()` call increments `segment_counter` to track segment ordinals (since `SegmentReader` doesn't expose `segment_ordinal()`)
-- Scorers call `sink.insert(segment_ord, doc_id, offsets)` as a free byproduct of verification — no extra work
+- Scorers call `sink.insert(segment_ord, doc_id, offsets)` as a free byproduct of scoring — no extra work
 - After search, the caller reads offsets via `sink.get(segment_ord, doc_id)`
+- **Important:** `next_segment()` must be called for every segment, even when returning an empty scorer (e.g. term not found), to keep the counter in sync with the real segment ordinals used by `TopDocs`
 
-**Supported scorers:** `NgramContainsScorer`, `ContainsScorer`, `ContainsSingleScorer` (all via `with_highlight_sink()`)
+**Supported query types:**
 
-**File:** `src/query/phrase_query/scoring_utils.rs` — `HighlightSink` struct + `HighlightKey` type alias
+| Query type | Scorer | Offset source |
+|------------|--------|---------------|
+| **contains** | `ContainsScorer`, `ContainsSingleScorer` | Stored text verification (free byproduct) |
+| **ngram contains** | `NgramContainsScorer` | Stored text verification (free byproduct) |
+| **term** | `TermScorer` | Postings byte offsets via `append_offsets()` |
+| **fuzzy** | `AutomatonWeight` | Postings byte offsets (captured during scorer construction) |
+| **regex** | `AutomatonWeight` | Postings byte offsets (captured during scorer construction) |
+| **phrase** | `PhraseScorer` | Postings byte offsets via `drain_or_capture_offsets()` |
+
+All scorers accept the sink via `with_highlight_sink()`.
+
+**Files:**
+- `src/query/phrase_query/scoring_utils.rs` — `HighlightSink` struct + `HighlightKey` type alias
+- `src/query/term_query/term_scorer.rs` — `capture_offsets()` in `advance()` / `seek()`
+- `src/query/term_query/term_weight.rs` — forces `WithFreqsAndPositionsAndOffsets`, segment_ord sync
+- `src/query/automaton_weight.rs` — highlight path reads full postings with offsets per matching term
+- `src/query/phrase_query/phrase_scorer.rs` — `drain_or_capture_offsets()` keeps position/offset readers in sync
+- `src/query/phrase_query/phrase_weight.rs` — forces `WithFreqsAndPositionsAndOffsets`, segment_ord sync
+- `src/query/fuzzy_query.rs` — sink propagation + custom `Debug` (excludes sink)
+- `src/query/regex_query.rs` — sink propagation
+- `src/query/phrase_query/phrase_query.rs` — sink propagation
+- `src/query/term_query/term_query.rs` — sink propagation
 
 ### 5. WithFreqsAndPositionsAndOffsets — byte offsets in postings
 
@@ -161,7 +183,7 @@ ld-tantivy = { path = "../ld-tantivy", features = ["stopwords", "lz4-compression
 
 - [quickwit-oss/tantivy](https://github.com/quickwit-oss/tantivy) — original full-text search engine in Rust
 - [izihawa/tantivy](https://github.com/izihawa/tantivy) — v0.26.0 fork with regex phrase queries, FST improvements
-- **L-Defraiteur/tantivy** — this fork: ContainsQuery, NgramContainsQuery, byte offsets, separator validation, HighlightSink
+- **L-Defraiteur/tantivy** — this fork: ContainsQuery, NgramContainsQuery, byte offsets, separator validation, HighlightSink for all query types
 
 ## License
 

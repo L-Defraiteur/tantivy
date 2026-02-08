@@ -1,7 +1,10 @@
+use std::sync::Arc;
+
 use crate::docset::DocSet;
 use crate::fieldnorm::FieldNormReader;
 use crate::postings::{FreqReadingOption, Postings, SegmentPostings};
 use crate::query::bm25::Bm25Weight;
+use crate::query::phrase_query::scoring_utils::HighlightSink;
 use crate::query::{Explanation, Scorer};
 use crate::{DocId, Score};
 
@@ -10,6 +13,8 @@ pub struct TermScorer {
     postings: SegmentPostings,
     fieldnorm_reader: FieldNormReader,
     similarity_weight: Bm25Weight,
+    highlight_sink: Option<Arc<HighlightSink>>,
+    segment_ord: u32,
 }
 
 impl TermScorer {
@@ -22,7 +27,22 @@ impl TermScorer {
             postings,
             fieldnorm_reader,
             similarity_weight,
+            highlight_sink: None,
+            segment_ord: 0,
         }
+    }
+
+    pub fn with_highlight_sink(
+        mut self,
+        sink: Arc<HighlightSink>,
+        segment_ord: u32,
+    ) -> Self {
+        self.highlight_sink = Some(sink);
+        self.segment_ord = segment_ord;
+        // Capture offsets for the initial document position (before any advance() call)
+        let doc = self.postings.doc();
+        self.capture_offsets(doc);
+        self
     }
 
     pub(crate) fn seek_block(&mut self, target_doc: DocId) {
@@ -95,17 +115,39 @@ impl TermScorer {
     pub fn last_doc_in_block(&self) -> DocId {
         self.postings.block_cursor.skip_reader().last_doc_in_block()
     }
+
+    #[inline]
+    fn capture_offsets(&mut self, doc: DocId) {
+        if doc == crate::TERMINATED {
+            return;
+        }
+        if let Some(ref sink) = self.highlight_sink {
+            let mut offsets_buf = Vec::new();
+            self.postings.append_offsets(&mut offsets_buf);
+            if !offsets_buf.is_empty() {
+                let offsets: Vec<[usize; 2]> = offsets_buf
+                    .iter()
+                    .map(|&(from, to)| [from as usize, to as usize])
+                    .collect();
+                sink.insert(self.segment_ord, doc, offsets);
+            }
+        }
+    }
 }
 
 impl DocSet for TermScorer {
     #[inline]
     fn advance(&mut self) -> DocId {
-        self.postings.advance()
+        let doc = self.postings.advance();
+        self.capture_offsets(doc);
+        doc
     }
 
     #[inline]
     fn seek(&mut self, target: DocId) -> DocId {
-        self.postings.seek(target)
+        let doc = self.postings.seek(target);
+        self.capture_offsets(doc);
+        doc
     }
 
     #[inline]

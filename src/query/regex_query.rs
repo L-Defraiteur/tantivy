@@ -4,6 +4,7 @@ use std::sync::Arc;
 use tantivy_fst::Regex;
 
 use crate::error::TantivyError;
+use crate::query::phrase_query::scoring_utils::HighlightSink;
 use crate::query::{AutomatonWeight, EnableScoring, Query, Weight};
 use crate::schema::Field;
 
@@ -57,6 +58,7 @@ use crate::schema::Field;
 pub struct RegexQuery {
     regex: Arc<Regex>,
     field: Field,
+    highlight_sink: Option<Arc<HighlightSink>>,
 }
 
 impl RegexQuery {
@@ -72,11 +74,21 @@ impl RegexQuery {
         RegexQuery {
             regex: regex.into(),
             field,
+            highlight_sink: None,
         }
     }
 
+    pub fn with_highlight_sink(mut self, sink: Arc<HighlightSink>) -> Self {
+        self.highlight_sink = Some(sink);
+        self
+    }
+
     fn specialized_weight(&self) -> AutomatonWeight<Regex> {
-        AutomatonWeight::new(self.field, self.regex.clone())
+        let mut weight = AutomatonWeight::new(self.field, self.regex.clone());
+        if let Some(ref sink) = self.highlight_sink {
+            weight = weight.with_highlight_sink(Arc::clone(sink));
+        }
+        weight
     }
 }
 

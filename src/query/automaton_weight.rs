@@ -5,12 +5,14 @@ use common::BitSet;
 use tantivy_fst::Automaton;
 
 use super::phrase_prefix_query::prefix_end;
+use crate::docset::DocSet;
 use crate::index::SegmentReader;
-use crate::postings::TermInfo;
+use crate::postings::{Postings, TermInfo};
+use crate::query::phrase_query::scoring_utils::HighlightSink;
 use crate::query::{BitSetDocSet, ConstScorer, Explanation, Scorer, Weight};
 use crate::schema::{Field, IndexRecordOption};
 use crate::termdict::{TermDictionary, TermStreamer};
-use crate::{DocId, Score, TantivyError};
+use crate::{DocId, Score, TantivyError, TERMINATED};
 
 /// A weight struct for Fuzzy Term and Regex Queries
 pub struct AutomatonWeight<A> {
@@ -20,6 +22,7 @@ pub struct AutomatonWeight<A> {
     // We apply additional filtering based on the given JSON path, when searching within the term
     // dictionary. This prevents terms from unrelated paths from matching the search criteria.
     json_path_bytes: Option<Box<[u8]>>,
+    highlight_sink: Option<Arc<HighlightSink>>,
 }
 
 impl<A> AutomatonWeight<A>
@@ -33,6 +36,7 @@ where
             field,
             automaton: automaton.into(),
             json_path_bytes: None,
+            highlight_sink: None,
         }
     }
 
@@ -46,7 +50,13 @@ where
             field,
             automaton: automaton.into(),
             json_path_bytes: Some(json_path_bytes.to_vec().into_boxed_slice()),
+            highlight_sink: None,
         }
+    }
+
+    pub fn with_highlight_sink(mut self, sink: Arc<HighlightSink>) -> Self {
+        self.highlight_sink = Some(sink);
+        self
     }
 
     fn automaton_stream<'a>(
@@ -90,21 +100,51 @@ where
         let inverted_index = reader.inverted_index(self.field)?;
         let term_dict = inverted_index.terms();
         let mut term_stream = self.automaton_stream(term_dict)?;
-        while term_stream.advance() {
-            let term_info = term_stream.value();
-            let mut block_segment_postings = inverted_index
-                .read_block_postings_from_terminfo(term_info, IndexRecordOption::Basic)?;
-            loop {
-                let docs = block_segment_postings.docs();
-                if docs.is_empty() {
-                    break;
-                }
-                for &doc in docs {
+
+        if let Some(ref sink) = self.highlight_sink {
+            let segment_ord = sink.next_segment();
+            while term_stream.advance() {
+                let term_info = term_stream.value().clone();
+                let mut segment_postings = inverted_index.read_postings_from_terminfo(
+                    &term_info,
+                    IndexRecordOption::WithFreqsAndPositionsAndOffsets,
+                )?;
+                loop {
+                    let doc = segment_postings.doc();
+                    if doc == TERMINATED {
+                        break;
+                    }
                     doc_bitset.insert(doc);
+                    let mut offsets_buf = Vec::new();
+                    segment_postings.append_offsets(&mut offsets_buf);
+                    if !offsets_buf.is_empty() {
+                        let offsets: Vec<[usize; 2]> = offsets_buf
+                            .iter()
+                            .map(|&(from, to)| [from as usize, to as usize])
+                            .collect();
+                        sink.insert(segment_ord, doc, offsets);
+                    }
+                    segment_postings.advance();
                 }
-                block_segment_postings.advance();
+            }
+        } else {
+            while term_stream.advance() {
+                let term_info = term_stream.value();
+                let mut block_segment_postings = inverted_index
+                    .read_block_postings_from_terminfo(term_info, IndexRecordOption::Basic)?;
+                loop {
+                    let docs = block_segment_postings.docs();
+                    if docs.is_empty() {
+                        break;
+                    }
+                    for &doc in docs {
+                        doc_bitset.insert(doc);
+                    }
+                    block_segment_postings.advance();
+                }
             }
         }
+
         let doc_bitset = BitSetDocSet::from(doc_bitset);
         let const_scorer = ConstScorer::new(doc_bitset, boost);
         Ok(Box::new(const_scorer))

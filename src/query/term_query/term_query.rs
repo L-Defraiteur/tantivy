@@ -1,8 +1,10 @@
 use std::fmt;
 use std::ops::Bound;
+use std::sync::Arc;
 
 use super::term_weight::TermWeight;
 use crate::query::bm25::Bm25Weight;
+use crate::query::phrase_query::scoring_utils::HighlightSink;
 use crate::query::range_query::is_type_valid_for_fastfield_range_query;
 use crate::query::{EnableScoring, Explanation, Query, RangeQuery, Weight};
 use crate::schema::IndexRecordOption;
@@ -60,6 +62,7 @@ use crate::Term;
 pub struct TermQuery {
     term: Term,
     index_record_option: IndexRecordOption,
+    highlight_sink: Option<Arc<HighlightSink>>,
 }
 
 impl fmt::Debug for TermQuery {
@@ -74,7 +77,13 @@ impl TermQuery {
         TermQuery {
             term,
             index_record_option: segment_postings_options,
+            highlight_sink: None,
         }
+    }
+
+    pub fn with_highlight_sink(mut self, sink: Arc<HighlightSink>) -> Self {
+        self.highlight_sink = Some(sink);
+        self
     }
 
     /// The `Term` this query is built out of.
@@ -113,12 +122,16 @@ impl TermQuery {
             IndexRecordOption::Basic
         };
 
-        Ok(TermWeight::new(
+        let mut weight = TermWeight::new(
             self.term.clone(),
             index_record_option,
             bm25_weight,
             scoring_enabled,
-        ))
+        );
+        if let Some(ref sink) = self.highlight_sink {
+            weight = weight.with_highlight_sink(Arc::clone(sink));
+        }
+        Ok(weight)
     }
 }
 
