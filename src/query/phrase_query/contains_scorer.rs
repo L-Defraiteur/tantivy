@@ -1,6 +1,8 @@
 use std::cmp::min;
+use std::sync::Arc;
 
 use super::phrase_scorer::{intersection, intersection_exists, PostingsWithOffset};
+use super::scoring_utils::{edit_distance, tokenize_raw, HighlightSink};
 use crate::docset::{DocSet, TERMINATED};
 use crate::fieldnorm::FieldNormReader;
 use crate::postings::Postings;
@@ -10,51 +12,6 @@ use crate::schema::document::Value;
 use crate::schema::Field;
 use crate::store::StoreReader;
 use crate::{DocId, Score, TantivyDocument};
-
-/// Computes the Levenshtein edit distance between two strings.
-fn edit_distance(a: &str, b: &str) -> u32 {
-    let a_bytes = a.as_bytes();
-    let b_bytes = b.as_bytes();
-    let m = a_bytes.len();
-    let n = b_bytes.len();
-    let mut prev = (0..=n as u32).collect::<Vec<_>>();
-    let mut curr = vec![0u32; n + 1];
-    for i in 1..=m {
-        curr[0] = i as u32;
-        for j in 1..=n {
-            let cost = if a_bytes[i - 1] == b_bytes[j - 1] {
-                0
-            } else {
-                1
-            };
-            curr[j] = min(min(curr[j - 1] + 1, prev[j] + 1), prev[j - 1] + cost);
-        }
-        std::mem::swap(&mut prev, &mut curr);
-    }
-    prev[n]
-}
-
-/// Re-tokenize raw text into (byte_offset_from, byte_offset_to) pairs.
-/// Splits on non-alphanumeric characters (same as default tokenizer).
-/// Returns offsets indexed by position (0, 1, 2, ...).
-fn tokenize_raw(text: &str) -> Vec<(usize, usize)> {
-    let bytes = text.as_bytes();
-    let mut tokens = Vec::new();
-    let mut i = 0;
-    while i < bytes.len() {
-        // Skip non-alphanumeric
-        if !bytes[i].is_ascii_alphanumeric() {
-            i += 1;
-            continue;
-        }
-        let start = i;
-        while i < bytes.len() && bytes[i].is_ascii_alphanumeric() {
-            i += 1;
-        }
-        tokens.push((start, i));
-    }
-    tokens
-}
 
 /// ContainsScorer: multi-token scorer with separator validation.
 ///
@@ -84,6 +41,10 @@ pub struct ContainsScorer<TPostings: Postings> {
     fieldnorm_reader: FieldNormReader,
     similarity_weight_opt: Option<Bm25Weight>,
     phrase_count: u32,
+
+    // Highlighting
+    highlight_sink: Option<Arc<HighlightSink>>,
+    segment_ord: u32,
 }
 
 impl<TPostings: Postings> ContainsScorer<TPostings> {
@@ -99,6 +60,8 @@ impl<TPostings: Postings> ContainsScorer<TPostings> {
         cascade_distances: Vec<u32>,
         store_reader: StoreReader,
         field: Field,
+        highlight_sink: Option<Arc<HighlightSink>>,
+        segment_ord: u32,
     ) -> ContainsScorer<TPostings> {
         let num_docs = fieldnorm_reader.num_docs();
         let max_offset = term_postings_with_offset
@@ -131,6 +94,8 @@ impl<TPostings: Postings> ContainsScorer<TPostings> {
             fieldnorm_reader,
             similarity_weight_opt,
             phrase_count: 0,
+            highlight_sink,
+            segment_ord,
         };
         if scorer.doc() != TERMINATED && !scorer.phrase_match() {
             scorer.advance();
@@ -392,6 +357,17 @@ impl<TPostings: Postings> ContainsScorer<TPostings> {
                 }
             }
 
+            if let Some(ref sink) = self.highlight_sink {
+                let offsets: Vec<[usize; 2]> = token_offsets
+                    .iter()
+                    .map(|&(from, to)| [from, to])
+                    .collect();
+                sink.insert(
+                    self.segment_ord,
+                    self.intersection_docset.doc(),
+                    offsets,
+                );
+            }
             count += 1;
         }
         Some(count)
@@ -454,6 +430,8 @@ pub struct ContainsSingleScorer {
     strict_separators: bool,
     cascade_distance: u32,
     boost: Score,
+    highlight_sink: Option<Arc<HighlightSink>>,
+    segment_ord: u32,
 }
 
 impl ContainsSingleScorer {
@@ -468,6 +446,8 @@ impl ContainsSingleScorer {
         strict_separators: bool,
         cascade_distance: u32,
         boost: Score,
+        highlight_sink: Option<Arc<HighlightSink>>,
+        segment_ord: u32,
     ) -> ContainsSingleScorer {
         let mut scorer = ContainsSingleScorer {
             bitset_docset,
@@ -480,6 +460,8 @@ impl ContainsSingleScorer {
             strict_separators,
             cascade_distance,
             boost,
+            highlight_sink,
+            segment_ord,
         };
         // Advance to the first valid doc
         if scorer.bitset_docset.doc() != TERMINATED && !scorer.validate_current() {
@@ -566,6 +548,9 @@ impl ContainsSingleScorer {
                 }
             }
 
+            if let Some(ref sink) = self.highlight_sink {
+                sink.insert(self.segment_ord, self.bitset_docset.doc(), vec![[start, end]]);
+            }
             return true;
         }
         false
@@ -605,50 +590,4 @@ impl Scorer for ContainsSingleScorer {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_edit_distance_identical() {
-        assert_eq!(edit_distance("hello", "hello"), 0);
-    }
-
-    #[test]
-    fn test_edit_distance_one() {
-        assert_eq!(edit_distance("-", "_"), 1);
-        assert_eq!(edit_distance("++", "+"), 1);
-    }
-
-    #[test]
-    fn test_edit_distance_empty() {
-        assert_eq!(edit_distance("", "abc"), 3);
-        assert_eq!(edit_distance("abc", ""), 3);
-        assert_eq!(edit_distance("", ""), 0);
-    }
-
-    #[test]
-    fn test_tokenize_raw_simple() {
-        let tokens = tokenize_raw("hello world");
-        assert_eq!(tokens, vec![(0, 5), (6, 11)]);
-    }
-
-    #[test]
-    fn test_tokenize_raw_special_chars() {
-        let tokens = tokenize_raw("c++ is great");
-        // "c" at 0..1, "is" at 4..6, "great" at 7..12
-        assert_eq!(tokens, vec![(0, 1), (4, 6), (7, 12)]);
-    }
-
-    #[test]
-    fn test_tokenize_raw_separators() {
-        let tokens = tokenize_raw("hello-world");
-        assert_eq!(tokens, vec![(0, 5), (6, 11)]);
-    }
-
-    #[test]
-    fn test_tokenize_raw_multiple_separators() {
-        let tokens = tokenize_raw("a--b");
-        assert_eq!(tokens, vec![(0, 1), (3, 4)]);
-    }
-}
+// Tests for edit_distance and tokenize_raw are in scoring_utils.rs

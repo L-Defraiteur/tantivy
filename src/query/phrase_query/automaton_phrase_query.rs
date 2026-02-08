@@ -1,4 +1,7 @@
+use std::sync::Arc;
+
 use super::automaton_phrase_weight::AutomatonPhraseWeight;
+use super::scoring_utils::HighlightSink;
 use crate::query::bm25::Bm25Weight;
 use crate::query::{EnableScoring, Query, Weight};
 use crate::schema::{Field, IndexRecordOption, Term, Type};
@@ -26,6 +29,7 @@ pub struct AutomatonPhraseQuery {
     query_suffix: String,
     distance_budget: u32,
     strict_separators: bool,
+    highlight_sink: Option<Arc<HighlightSink>>,
 }
 
 impl AutomatonPhraseQuery {
@@ -53,6 +57,7 @@ impl AutomatonPhraseQuery {
             query_suffix: String::new(),
             distance_budget: 0,
             strict_separators: true,
+            highlight_sink: None,
         }
     }
 
@@ -87,7 +92,14 @@ impl AutomatonPhraseQuery {
             query_suffix,
             distance_budget,
             strict_separators,
+            highlight_sink: None,
         }
+    }
+
+    /// Attach a highlight sink to capture byte offsets during scoring.
+    pub fn with_highlight_sink(mut self, sink: Arc<HighlightSink>) -> Self {
+        self.highlight_sink = Some(sink);
+        self
     }
 
     /// The [`Field`] this query targets.
@@ -150,6 +162,7 @@ impl AutomatonPhraseQuery {
             self.query_suffix.clone(),
             self.distance_budget,
             self.strict_separators,
+            self.highlight_sink.clone(),
         ))
     }
 }

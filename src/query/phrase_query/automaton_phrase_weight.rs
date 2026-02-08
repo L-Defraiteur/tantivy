@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use common::BitSet;
 use levenshtein_automata::LevenshteinAutomatonBuilder;
 use once_cell::sync::OnceCell;
@@ -5,6 +7,7 @@ use tantivy_fst::Regex;
 
 use super::contains_scorer::{ContainsScorer, ContainsSingleScorer};
 use super::regex_phrase_weight::RegexPhraseWeight;
+use super::scoring_utils::HighlightSink;
 use super::PhraseScorer;
 use crate::fieldnorm::FieldNormReader;
 use crate::index::SegmentReader;
@@ -54,6 +57,7 @@ pub struct AutomatonPhraseWeight {
     query_suffix: String,
     distance_budget: u32,
     strict_separators: bool,
+    highlight_sink: Option<Arc<HighlightSink>>,
 }
 
 impl AutomatonPhraseWeight {
@@ -69,6 +73,7 @@ impl AutomatonPhraseWeight {
         query_suffix: String,
         distance_budget: u32,
         strict_separators: bool,
+        highlight_sink: Option<Arc<HighlightSink>>,
     ) -> Self {
         AutomatonPhraseWeight {
             field,
@@ -82,6 +87,7 @@ impl AutomatonPhraseWeight {
             query_suffix,
             distance_budget,
             strict_separators,
+            highlight_sink,
         }
     }
 
@@ -182,6 +188,7 @@ impl AutomatonPhraseWeight {
         &self,
         reader: &SegmentReader,
         boost: Score,
+        segment_ord: u32,
     ) -> crate::Result<Option<Box<dyn Scorer>>> {
         let similarity_weight_opt = self
             .similarity_weight_opt
@@ -227,6 +234,8 @@ impl AutomatonPhraseWeight {
                 cascade_distances,
                 store_reader,
                 text_field,
+                self.highlight_sink.clone(),
+                segment_ord,
             ))))
         } else {
             Ok(Some(Box::new(PhraseScorer::new(
@@ -243,6 +252,7 @@ impl AutomatonPhraseWeight {
         &self,
         reader: &SegmentReader,
         boost: Score,
+        segment_ord: u32,
     ) -> crate::Result<Box<dyn Scorer>> {
         let inverted_index = reader.inverted_index(self.field)?;
         let token = &self.phrase_terms[0].1;
@@ -284,6 +294,8 @@ impl AutomatonPhraseWeight {
                 self.strict_separators,
                 level.distance(),
                 boost,
+                self.highlight_sink.clone(),
+                segment_ord,
             )))
         } else {
             Ok(Box::new(ConstScorer::new(
@@ -296,10 +308,15 @@ impl AutomatonPhraseWeight {
 
 impl Weight for AutomatonPhraseWeight {
     fn scorer(&self, reader: &SegmentReader, boost: Score) -> crate::Result<Box<dyn Scorer>> {
+        let segment_ord = self
+            .highlight_sink
+            .as_ref()
+            .map(|s| s.next_segment())
+            .unwrap_or(0);
         if self.phrase_terms.len() <= 1 {
-            return self.single_token_scorer(reader, boost);
+            return self.single_token_scorer(reader, boost, segment_ord);
         }
-        if let Some(scorer) = self.phrase_scorer(reader, boost)? {
+        if let Some(scorer) = self.phrase_scorer(reader, boost, segment_ord)? {
             Ok(scorer)
         } else {
             Ok(Box::new(EmptyScorer))

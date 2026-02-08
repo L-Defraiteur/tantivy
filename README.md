@@ -1,6 +1,6 @@
 # ld-tantivy
 
-Fork of [tantivy](https://github.com/quickwit-oss/tantivy) (via [izihawa/tantivy](https://github.com/izihawa/tantivy) v0.26.0) with three major extensions for content search: **ContainsQuery**, **byte offsets in postings**, and **separator validation**.
+Fork of [tantivy](https://github.com/quickwit-oss/tantivy) (via [izihawa/tantivy](https://github.com/izihawa/tantivy) v0.26.0) with extensions for content search: **ContainsQuery**, **NgramContainsQuery**, **byte offsets in postings**, **separator validation**, and **HighlightSink**.
 
 ```
 quickwit-oss/tantivy v0.22
@@ -19,14 +19,16 @@ A new query type that searches for substrings within indexed terms, with automat
 1. **Exact** — direct term dictionary lookup
 2. **Fuzzy** — Levenshtein automaton (configurable distance, default 1)
 3. **Substring** — regex `.*token.*` on the term dictionary
+4. **Fuzzy substring** — combined `.*{levenshtein(token,d)}.*` automaton on the term dictionary
 
 Early termination: as soon as one level finds matches for a position, lower levels are skipped.
 
 For multi-token queries (`"std::collections"`, `"os.path.join"`), the `PhraseScorer` then verifies that positions are consecutive in the document.
 
 **Files:**
-- `src/query/phrase_query/automaton_phrase_query.rs` (162 lines) — Query struct, `new()` and `new_with_separators()` constructors
-- `src/query/phrase_query/automaton_phrase_weight.rs` (415 lines) — Weight with cascade, `CascadeLevel` enum, 6 unit tests
+- `src/query/phrase_query/automaton_phrase_query.rs` — Query struct, `new()` and `new_with_separators()` constructors
+- `src/query/phrase_query/automaton_phrase_weight.rs` — Weight with 4-level cascade, `CascadeLevel` enum, 6 unit tests
+- `src/query/fuzzy_substring_automaton.rs` — `FuzzySubstringAutomaton` for level 4
 
 ### 2. ContainsScorer — separator validation and cumulative distance
 
@@ -57,9 +59,44 @@ A custom scorer that validates non-alphanumeric characters (separators) between 
 | `os.path.join` | `"import os.path.join for files"` | match (`.` separators exact) |
 | `option<result<(i32` | `"Vec<Option<Result<(i32,&str)>>"` | match (`<`, `<(` separators valid) |
 
-**File:** `src/query/phrase_query/contains_scorer.rs` (605 lines) — `ContainsScorer` (multi-token) + `ContainsSingleScorer` (single-token) + `edit_distance()` + `tokenize_raw()`
+**Files:**
+- `src/query/phrase_query/contains_scorer.rs` — `ContainsScorer` (multi-token) + `ContainsSingleScorer` (single-token)
+- `src/query/phrase_query/scoring_utils.rs` — shared `edit_distance()`, `tokenize_raw()`, `token_match_distance()`, `HighlightSink`
 
-### 3. WithFreqsAndPositionsAndOffsets — byte offsets in postings
+### 3. NgramContainsQuery — trigram-accelerated contains search
+
+A fast alternative to AutomatonPhraseQuery that uses a trigram (ngram) index for candidate lookup, then verifies matches against stored text. Best for fields with a dedicated `._ngram` subfield.
+
+**How it works:**
+1. Extract trigrams from query tokens → look up in the ngram inverted index → get candidate doc IDs
+2. For each candidate, read stored text and re-tokenize with `tokenize_raw()`
+3. Verify token matches (exact, fuzzy, or substring) with separator validation and cumulative distance budget
+4. Same two validation modes as ContainsScorer (`strict_separators` / relaxed)
+
+**File:** `src/query/phrase_query/ngram_contains_query.rs` — Query, Weight, Scorer with trigram candidate filtering
+
+### 4. HighlightSink — side-channel byte offset capture
+
+A thread-safe sink for capturing byte offsets during scoring, used by the FFI layer to return highlight ranges without re-tokenization.
+
+```rust
+pub struct HighlightSink {
+    data: Mutex<HashMap<(u32, DocId), Vec<[usize; 2]>>>,
+    segment_counter: AtomicU32,
+}
+```
+
+**How it works:**
+- Shared via `Arc<HighlightSink>` between the caller and scorers
+- Each `Weight::scorer()` call increments `segment_counter` to track segment ordinals (since `SegmentReader` doesn't expose `segment_ordinal()`)
+- Scorers call `sink.insert(segment_ord, doc_id, offsets)` as a free byproduct of verification — no extra work
+- After search, the caller reads offsets via `sink.get(segment_ord, doc_id)`
+
+**Supported scorers:** `NgramContainsScorer`, `ContainsScorer`, `ContainsSingleScorer` (all via `with_highlight_sink()`)
+
+**File:** `src/query/phrase_query/scoring_utils.rs` — `HighlightSink` struct + `HighlightKey` type alias
+
+### 5. WithFreqsAndPositionsAndOffsets — byte offsets in postings
 
 New `IndexRecordOption` variant that stores byte offsets (`offset_from`, `offset_to`) of each token occurrence directly in the postings, like Lucene's `DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS`.
 
@@ -108,7 +145,7 @@ InvertedIndexReader::read_postings_from_terminfo()
 ## Building
 
 ```bash
-cargo test --lib    # 997 tests (7 ignored — format compat v6/v7)
+cargo test --lib    # 1015 tests (7 ignored — format compat v6/v7)
 ```
 
 ## Usage with tantivy_fts
@@ -124,7 +161,7 @@ ld-tantivy = { path = "../ld-tantivy", features = ["stopwords", "lz4-compression
 
 - [quickwit-oss/tantivy](https://github.com/quickwit-oss/tantivy) — original full-text search engine in Rust
 - [izihawa/tantivy](https://github.com/izihawa/tantivy) — v0.26.0 fork with regex phrase queries, FST improvements
-- **L-Defraiteur/tantivy** — this fork: ContainsQuery, byte offsets, separator validation, cumulative distance
+- **L-Defraiteur/tantivy** — this fork: ContainsQuery, NgramContainsQuery, byte offsets, separator validation, HighlightSink
 
 ## License
 
