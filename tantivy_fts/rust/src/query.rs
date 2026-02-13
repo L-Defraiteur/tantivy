@@ -5,18 +5,16 @@
 //!   - term, fuzzy, regex       → raw field (precision: exact word forms, lowercase only)
 //! The user always references the base field name; routing is transparent.
 
-use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use ld_tantivy::collector::{FilterCollector, TopDocs};
 use ld_tantivy::query::{
     AutomatonPhraseQuery, BooleanQuery, FuzzyTermQuery, HighlightSink, NgramContainsQuery, Occur,
     PhraseQuery, Query, QueryParser, RegexQuery, TermQuery,
 };
 use ld_tantivy::schema::{Field, FieldType, IndexRecordOption, Schema, Term};
-use ld_tantivy::{Document, Index, Searcher, TantivyDocument};
+use ld_tantivy::Index;
 
 // ─── Schema Config ──────────────────────────────────────────────────────────
 
@@ -50,21 +48,10 @@ pub struct QueryConfig {
     pub pattern: Option<String>,
     pub distance: Option<u8>,
     pub strict_separators: Option<bool>,
-    pub highlight: Option<bool>,
     // Boolean query sub-clauses
     pub must: Option<Vec<QueryConfig>>,
     pub should: Option<Vec<QueryConfig>>,
     pub must_not: Option<Vec<QueryConfig>>,
-}
-
-// ─── Search Result ──────────────────────────────────────────────────────────
-
-#[derive(serde::Serialize)]
-pub struct SearchResult {
-    pub score: f32,
-    pub doc: serde_json::Value,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub highlights: Option<std::collections::HashMap<String, Vec<[usize; 2]>>>,
 }
 
 // ─── Tokenization Helper ────────────────────────────────────────────────────
@@ -477,79 +464,3 @@ fn build_parsed_query(
         .map_err(|e| format!("query parse error: {e}"))
 }
 
-// ─── Search Execution ───────────────────────────────────────────────────────
-
-pub fn execute_search(
-    searcher: &Searcher,
-    query: &dyn Query,
-    limit: u32,
-    schema: &Schema,
-    highlight_sink: Option<&HighlightSink>,
-    highlight_field: Option<&str>,
-) -> Result<Vec<SearchResult>, String> {
-    let collector = TopDocs::with_limit(limit as usize).order_by_score();
-    let top_docs = searcher
-        .search(query, &collector)
-        .map_err(|e| format!("search error: {e}"))?;
-
-    collect_results(searcher, &top_docs, schema, highlight_sink, highlight_field)
-}
-
-/// Search with pre-filtering by allowed node IDs.
-pub fn execute_search_filtered(
-    searcher: &Searcher,
-    query: &dyn Query,
-    limit: u32,
-    schema: &Schema,
-    allowed_ids: HashSet<u64>,
-    highlight_sink: Option<&HighlightSink>,
-    highlight_field: Option<&str>,
-) -> Result<Vec<SearchResult>, String> {
-    let inner = TopDocs::with_limit(limit as usize).order_by_score();
-    let collector = FilterCollector::new(
-        crate::handle::NODE_ID_FIELD.to_string(),
-        move |value: u64| allowed_ids.contains(&value),
-        inner,
-    );
-
-    let top_docs = searcher
-        .search(query, &collector)
-        .map_err(|e| format!("filtered search error: {e}"))?;
-
-    collect_results(searcher, &top_docs, schema, highlight_sink, highlight_field)
-}
-
-fn collect_results(
-    searcher: &Searcher,
-    top_docs: &[(f32, ld_tantivy::DocAddress)],
-    schema: &Schema,
-    highlight_sink: Option<&HighlightSink>,
-    highlight_field: Option<&str>,
-) -> Result<Vec<SearchResult>, String> {
-    let mut results = Vec::with_capacity(top_docs.len());
-    for &(score, doc_address) in top_docs {
-        let doc: TantivyDocument = searcher
-            .doc(doc_address)
-            .map_err(|e| format!("doc retrieval error: {e}"))?;
-
-        let doc_json = doc.to_named_doc(schema);
-        let doc_value = serde_json::to_value(&doc_json)
-            .map_err(|e| format!("json serialization error: {e}"))?;
-
-        let highlights = highlight_sink.and_then(|sink| {
-            let offsets = sink.get(doc_address.segment_ord, doc_address.doc_id)?;
-            let field_name = highlight_field?;
-            let mut map = HashMap::new();
-            map.insert(field_name.to_string(), offsets);
-            Some(map)
-        });
-
-        results.push(SearchResult {
-            score,
-            doc: doc_value,
-            highlights,
-        });
-    }
-
-    Ok(results)
-}

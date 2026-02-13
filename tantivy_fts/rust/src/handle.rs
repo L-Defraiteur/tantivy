@@ -163,13 +163,6 @@ impl TantivyHandle {
             .map(|(_, f)| *f)
     }
 
-    /// Get the `._raw` counterpart name for a user field, if it exists.
-    pub fn raw_field_name(&self, user_field: &str) -> Option<&str> {
-        self.raw_field_pairs
-            .iter()
-            .find(|(name, _)| name == user_field)
-            .map(|(_, raw)| raw.as_str())
-    }
 }
 
 fn build_schema(
