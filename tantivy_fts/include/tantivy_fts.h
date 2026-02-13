@@ -11,7 +11,7 @@
 #include <stdlib.h>
 
 /**
- * Reserved field name for Kuzu node IDs (auto-added to every schema).
+ * Reserved field name for Rag3db node IDs (auto-added to every schema).
  * u64, FAST | INDEXED. Used by tantivy_search_filtered().
  */
 #define TANTIVY_NODE_ID_FIELD "_node_id"
@@ -98,7 +98,7 @@ char *tantivy_search(TantivyHandlePtr handle, const char *query_json, uint32_t l
  * Search the index with pre-filtering by allowed node IDs.
  *
  * Only documents whose `_node_id` value is in the `allowed_ids` array are considered.
- * This is the key function for Kuzu graph-filtered FTS:
+ * This is the key function for Rag3db graph-filtered FTS:
  *   1. C++ extension runs Cypher WHERE → gets matching node IDs
  *   2. Passes them here → Tantivy only scores those documents
  *

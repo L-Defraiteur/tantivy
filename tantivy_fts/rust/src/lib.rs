@@ -8,6 +8,7 @@
 //! on the real filesystem; on Emscripten (WASM), they go through the
 //! Emscripten VFS (MEMFS/IDBFS).
 
+mod bridge;
 mod directory;
 mod handle;
 mod query;
@@ -329,7 +330,7 @@ pub unsafe extern "C" fn tantivy_search(
 /// Search the index with pre-filtering by allowed node IDs.
 ///
 /// Only documents whose `_node_id` value is in the `allowed_ids` array are considered.
-/// This is the key function for Kuzu graph-filtered FTS:
+/// This is the key function for Rag3db graph-filtered FTS:
 ///   1. C++ extension runs Cypher WHERE → gets matching node IDs
 ///   2. Passes them here → Tantivy only scores those documents
 ///

@@ -87,7 +87,7 @@ int main(void) {
     const char *docs[] = {
         "{\"_node_id\": 100, \"title\": \"The quick brown fox\",  \"body\": \"A fox jumped over the lazy dog\"}",
         "{\"_node_id\": 200, \"title\": \"Rust programming\",     \"body\": \"Rust is a systems programming language\"}",
-        "{\"_node_id\": 300, \"title\": \"Graph databases\",      \"body\": \"Kuzu is an embedded graph database\"}",
+        "{\"_node_id\": 300, \"title\": \"Graph databases\",      \"body\": \"Rag3db is an embedded graph database\"}",
         "{\"_node_id\": 400, \"title\": \"Search engines\",       \"body\": \"Tantivy is a full-text search engine written in Rust\"}",
         "{\"_node_id\": 500, \"title\": \"The lazy dog sleeps\",  \"body\": \"The dog was too lazy to chase the fox\"}"
     };
@@ -173,7 +173,7 @@ int main(void) {
         "{\"type\": \"parse\", \"fields\": [\"title\", \"body\"], \"value\": \"graph database\"}", 10);
     check(results != NULL, "tantivy_search (parse) returns non-null");
     if (results) {
-        check(strstr(results, "Kuzu") != NULL || strstr(results, "graph") != NULL,
+        check(strstr(results, "Rag3db") != NULL || strstr(results, "graph") != NULL,
               "parse query 'graph database' finds relevant doc");
         tantivy_free_string(results);
     }

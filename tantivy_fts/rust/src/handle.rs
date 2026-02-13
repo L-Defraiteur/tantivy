@@ -19,7 +19,7 @@ use ld_tantivy::{Index, IndexReader, IndexSettings, IndexWriter, ReloadPolicy};
 use crate::directory::StdFsDirectory;
 use crate::query::SchemaConfig;
 
-/// Reserved field name for Kuzu node IDs, used for filtered search.
+/// Reserved field name for Rag3db node IDs, used for filtered search.
 pub const NODE_ID_FIELD: &str = "_node_id";
 
 /// Suffix appended to text fields for the non-stemmed counterpart.
