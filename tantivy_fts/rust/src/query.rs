@@ -11,9 +11,12 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
 use ld_tantivy::query::{
-    AutomatonPhraseQuery, BooleanQuery, FuzzyTermQuery, HighlightSink, NgramContainsQuery, Occur,
-    PhraseQuery, Query, QueryParser, RangeQuery, RegexQuery, TermQuery,
+    AutomatonPhraseQuery, BooleanQuery, FuzzyParams, FuzzyTermQuery, HighlightSink,
+    NgramContainsQuery, Occur, PhraseQuery, Query, QueryParser, RangeQuery, RegexParams,
+    RegexQuery, TermQuery, VerificationMode,
 };
+use regex::Regex;
+use regex_syntax::hir::literal::Extractor;
 use ld_tantivy::schema::{Field, FieldType, IndexRecordOption, Schema, Term};
 use ld_tantivy::Index;
 
@@ -56,6 +59,7 @@ pub struct QueryConfig {
     pub pattern: Option<String>,
     pub distance: Option<u8>,
     pub strict_separators: Option<bool>,
+    pub regex: Option<bool>,
     // Boolean query sub-clauses
     pub must: Option<Vec<QueryConfig>>,
     pub should: Option<Vec<QueryConfig>>,
@@ -298,19 +302,31 @@ fn build_contains_query(
     ngram_pairs: &[(String, String)],
     highlight_sink: Option<Arc<HighlightSink>>,
 ) -> Result<Box<dyn Query>, String> {
+    let is_regex = config.regex.unwrap_or(false);
+    if is_regex {
+        return build_contains_regex(config, schema, raw_pairs, ngram_pairs, highlight_sink);
+    }
+    build_contains_fuzzy(config, schema, index, raw_pairs, ngram_pairs, highlight_sink)
+}
+
+/// Contains query in fuzzy mode (default): tokenize → trigrams → fuzzy verification → BM25.
+fn build_contains_fuzzy(
+    config: &QueryConfig,
+    schema: &Schema,
+    index: &Index,
+    raw_pairs: &[(String, String)],
+    ngram_pairs: &[(String, String)],
+    highlight_sink: Option<Arc<HighlightSink>>,
+) -> Result<Box<dyn Query>, String> {
     let field = resolve_field(config, schema, raw_pairs, true)?;
-    // Resolve the base (stored) field for loading text during separator validation.
-    // The raw field may not be stored, but the base field is.
     let stored_field = resolve_field(config, schema, raw_pairs, false).ok();
     let value = config.value.as_deref().ok_or("contains query requires 'value'")?;
     let fuzzy_distance = config.distance.unwrap_or(1);
     let strict_separators = config.strict_separators.unwrap_or(true);
 
-    // Tokenize through the raw field's tokenizer, preserving byte offsets.
     let tokens = tokenize_with_offsets(index, field, schema, value);
 
     if tokens.is_empty() {
-        // Empty input: regex substring on the raw value as fallback.
         let escaped = regex_escape(&value.to_lowercase());
         let pattern = format!(".*{escaped}.*");
         return RegexQuery::from_pattern(&pattern, field)
@@ -318,34 +334,33 @@ fn build_contains_query(
             .map_err(|e| format!("invalid contains pattern: {e}"));
     }
 
-    // Extract separators between consecutive tokens from the original query string.
     let separators: Vec<String> = tokens
         .windows(2)
         .map(|w| value[w[0].offset_to..w[1].offset_from].to_string())
         .collect();
 
-    // Extract prefix (chars before first token) and suffix (chars after last token).
     let prefix = value[..tokens.first().map(|t| t.offset_from).unwrap_or(0)].to_string();
     let suffix = value[tokens.last().map(|t| t.offset_to).unwrap_or(value.len())..].to_string();
 
     let token_texts: Vec<String> = tokens.iter().map(|t| t.text.clone()).collect();
-
-    // distance_budget defaults to fuzzy_distance (enough for one fuzzy token match).
     let distance_budget = fuzzy_distance as u32;
 
-    // If ngram field is available, use NgramContainsQuery (fast trigram lookup + verification).
     if let Some(ngram_field) = resolve_ngram_field(config, schema, ngram_pairs) {
-        let mut query = NgramContainsQuery::new(
-            field,
-            ngram_field,
-            stored_field,
-            token_texts,
+        let verification = VerificationMode::Fuzzy(FuzzyParams {
+            tokens: token_texts.clone(),
             separators,
             prefix,
             suffix,
             fuzzy_distance,
             distance_budget,
             strict_separators,
+        });
+        let mut query = NgramContainsQuery::new(
+            field,
+            ngram_field,
+            stored_field,
+            token_texts,
+            verification,
         );
         if let Some(sink) = highlight_sink {
             query = query.with_highlight_sink(sink);
@@ -388,6 +403,68 @@ fn build_contains_query(
         }
         Ok(Box::new(query))
     }
+}
+
+/// Contains query in regex mode: parse pattern → extract literals → trigrams → regex verification → BM25.
+fn build_contains_regex(
+    config: &QueryConfig,
+    schema: &Schema,
+    raw_pairs: &[(String, String)],
+    ngram_pairs: &[(String, String)],
+    highlight_sink: Option<Arc<HighlightSink>>,
+) -> Result<Box<dyn Query>, String> {
+    let field = resolve_field(config, schema, raw_pairs, true)?;
+    let stored_field = resolve_field(config, schema, raw_pairs, false).ok();
+    let pattern = config.value.as_deref().ok_or("contains regex query requires 'value'")?;
+    let fuzzy_distance = config.distance.unwrap_or(0); // regex default: no fuzzy
+
+    // 1. Compile the regex (case-insensitive for stored text matching).
+    let compiled = Regex::new(&format!("(?i){pattern}"))
+        .map_err(|e| format!("invalid regex pattern: {e}"))?;
+
+    // 2. Parse HIR and extract obligatory literals.
+    let hir = regex_syntax::parse(pattern)
+        .map_err(|e| format!("invalid regex syntax: {e}"))?;
+    let seq = Extractor::new().extract(&hir);
+    let literals: Vec<String> = seq
+        .literals()
+        .map(|lits| {
+            lits.iter()
+                .map(|lit| String::from_utf8_lossy(lit.as_bytes()).to_lowercase())
+                .filter(|s| s.len() >= 3) // Only keep literals >= 3 chars (useful for trigrams)
+                .collect()
+        })
+        .unwrap_or_default();
+
+    // 3. If we have an ngram field, always use NgramContainsQuery (with or without literals).
+    //    When literals are empty (< 3 chars), the scorer does a full segment scan
+    //    instead of trigram-based candidate collection, but still uses BM25 scoring.
+    if let Some(ngram_field) = resolve_ngram_field(config, schema, ngram_pairs) {
+        let verification = VerificationMode::Regex(RegexParams {
+            compiled,
+            literals: literals.clone(),
+            fuzzy_distance,
+        });
+        let mut query = NgramContainsQuery::new(
+            field,
+            ngram_field,
+            stored_field,
+            literals,
+            verification,
+        );
+        if let Some(sink) = highlight_sink {
+            query = query.with_highlight_sink(sink);
+        }
+        return Ok(Box::new(query));
+    }
+
+    // Fallback (no ngram field): standard RegexQuery (FST walk, ConstScorer — no BM25).
+    let mut query = RegexQuery::from_pattern(&format!("(?i){pattern}"), field)
+        .map_err(|e| format!("invalid regex: {e}"))?;
+    if let Some(sink) = highlight_sink {
+        query = query.with_highlight_sink(sink);
+    }
+    Ok(Box::new(query) as Box<dyn Query>)
 }
 
 /// Escape regex special characters in a string.

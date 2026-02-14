@@ -56,7 +56,7 @@ pub use self::phrase_prefix_query::PhrasePrefixQuery;
 pub use self::phrase_query::regex_phrase_query::{wildcard_query_to_regex_str, RegexPhraseQuery};
 pub use self::phrase_query::AutomatonPhraseQuery;
 pub use self::phrase_query::scoring_utils::HighlightSink;
-pub use self::phrase_query::NgramContainsQuery;
+pub use self::phrase_query::{FuzzyParams, NgramContainsQuery, RegexParams, VerificationMode};
 pub use self::phrase_query::PhraseQuery;
 pub use self::query::{EnableScoring, Query, QueryClone};
 pub use self::query_parser::{QueryParser, QueryParserError};

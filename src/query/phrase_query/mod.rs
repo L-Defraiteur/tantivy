@@ -10,7 +10,9 @@ mod regex_phrase_weight;
 pub mod scoring_utils;
 
 pub use self::automaton_phrase_query::AutomatonPhraseQuery;
-pub use self::ngram_contains_query::NgramContainsQuery;
+pub use self::ngram_contains_query::{
+    FuzzyParams, NgramContainsQuery, RegexParams, VerificationMode,
+};
 pub use self::phrase_query::PhraseQuery;
 pub(crate) use self::phrase_scorer::intersection_count;
 pub use self::phrase_scorer::PhraseScorer;

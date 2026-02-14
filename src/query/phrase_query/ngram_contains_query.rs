@@ -7,13 +7,19 @@
 //! Cascade:
 //!   1. **Exact**: term dict lookup on raw field — O(1)
 //!   2. **Ngram**: trigram lookup on ngram field + verification — O(k + candidates)
+//!
+//! Verification mode:
+//!   - **Fuzzy**: token-by-token matching with Levenshtein distance (default)
+//!   - **Regex**: compiled regex on stored text, with optional fuzzy on extracted literals
 
-use std::cmp::min;
+use std::cmp::{max, min};
 use std::sync::Arc;
 
+use regex::Regex;
+
 use super::scoring_utils::{
-    edit_distance, generate_trigrams, intersect_sorted_vecs, ngram_threshold, token_match_distance,
-    tokenize_raw, HighlightSink,
+    edit_distance, generate_trigrams, intersect_sorted_vecs, ngram_threshold,
+    token_match_distance, tokenize_raw, HighlightSink,
 };
 use crate::fieldnorm::FieldNormReader;
 use crate::query::bm25::Bm25Weight;
@@ -89,6 +95,44 @@ fn ngram_candidates_for_token(
     Ok(candidates)
 }
 
+// ─── Verification Mode ──────────────────────────────────────────────────────
+
+/// Parameters for fuzzy substring verification.
+#[derive(Clone, Debug)]
+pub struct FuzzyParams {
+    pub tokens: Vec<String>,
+    pub separators: Vec<String>,
+    pub prefix: String,
+    pub suffix: String,
+    pub fuzzy_distance: u8,
+    pub distance_budget: u32,
+    pub strict_separators: bool,
+}
+
+/// Parameters for regex verification (with optional fuzzy on extracted literals).
+#[derive(Clone, Debug)]
+pub struct RegexParams {
+    /// Compiled regex pattern for verification on stored text.
+    pub compiled: Regex,
+    /// Literals extracted from the regex AST (for hybrid fuzzy + trigram generation).
+    pub literals: Vec<String>,
+    /// Fuzzy distance for hybrid verification: 0 = regex only, >0 = regex OR fuzzy on literals.
+    pub fuzzy_distance: u8,
+}
+
+/// Verification mode for NgramContainsQuery.
+///
+/// Determines how candidate documents are verified after trigram-based
+/// candidate collection.
+#[derive(Clone, Debug)]
+pub enum VerificationMode {
+    /// Fuzzy substring verification: token-by-token matching with
+    /// Levenshtein distance, separator validation, and prefix/suffix checks.
+    Fuzzy(FuzzyParams),
+    /// Regex verification on stored text, with optional hybrid fuzzy on extracted literals.
+    Regex(RegexParams),
+}
+
 // ─── Query ─────────────────────────────────────────────────────────────────
 
 /// N-gram based contains query: trigram lookup + stored text verification.
@@ -100,51 +144,33 @@ pub struct NgramContainsQuery {
     raw_field: Field,
     ngram_field: Field,
     stored_field: Option<Field>,
-    tokens: Vec<String>,
-    separators: Vec<String>,
-    prefix: String,
-    suffix: String,
-    fuzzy_distance: u8,
-    distance_budget: u32,
-    strict_separators: bool,
+    trigram_sources: Vec<String>,
+    verification: VerificationMode,
     highlight_sink: Option<Arc<HighlightSink>>,
 }
 
 impl NgramContainsQuery {
     /// Creates a new `NgramContainsQuery`.
     ///
-    /// * `raw_field` - Lowercase raw field for exact term lookups.
+    /// * `raw_field` - Lowercase raw field for exact term lookups and BM25 stats.
     /// * `ngram_field` - Trigram field for candidate collection.
     /// * `stored_field` - Field to load stored text from (if different from `raw_field`).
-    /// * `tokens` - Query tokens (lowercased).
-    /// * `separators` - Separators between consecutive tokens in the query string.
-    /// * `prefix` / `suffix` - Characters before/after the token span.
-    /// * `fuzzy_distance` - Max Levenshtein distance per token.
-    /// * `distance_budget` - Max cumulative edit distance.
-    /// * `strict_separators` - Whether separators must match exactly (edit distance) vs relaxed.
+    /// * `trigram_sources` - Strings used for trigram generation (tokens in fuzzy mode,
+    ///   extracted literals in regex mode).
+    /// * `verification` - How to verify candidates (fuzzy or regex).
     pub fn new(
         raw_field: Field,
         ngram_field: Field,
         stored_field: Option<Field>,
-        tokens: Vec<String>,
-        separators: Vec<String>,
-        prefix: String,
-        suffix: String,
-        fuzzy_distance: u8,
-        distance_budget: u32,
-        strict_separators: bool,
+        trigram_sources: Vec<String>,
+        verification: VerificationMode,
     ) -> Self {
         NgramContainsQuery {
             raw_field,
             ngram_field,
             stored_field,
-            tokens,
-            separators,
-            prefix,
-            suffix,
-            fuzzy_distance,
-            distance_budget,
-            strict_separators,
+            trigram_sources,
+            verification,
             highlight_sink: None,
         }
     }
@@ -163,8 +189,11 @@ impl Query for NgramContainsQuery {
                 statistics_provider,
                 ..
             } => {
+                // Use trigram_sources as reference terms for BM25 stats.
+                // In fuzzy mode these are the query tokens; in regex mode
+                // they will be the extracted literals.
                 let terms: Vec<Term> = self
-                    .tokens
+                    .trigram_sources
                     .iter()
                     .map(|t| Term::from_field_text(self.raw_field, t))
                     .collect();
@@ -181,13 +210,8 @@ impl Query for NgramContainsQuery {
             raw_field: self.raw_field,
             ngram_field: self.ngram_field,
             stored_field: self.stored_field,
-            tokens: self.tokens.clone(),
-            separators: self.separators.clone(),
-            prefix: self.prefix.clone(),
-            suffix: self.suffix.clone(),
-            fuzzy_distance: self.fuzzy_distance,
-            distance_budget: self.distance_budget,
-            strict_separators: self.strict_separators,
+            trigram_sources: self.trigram_sources.clone(),
+            verification: self.verification.clone(),
             highlight_sink: self.highlight_sink.clone(),
             bm25_weight,
         }))
@@ -200,13 +224,8 @@ struct NgramContainsWeight {
     raw_field: Field,
     ngram_field: Field,
     stored_field: Option<Field>,
-    tokens: Vec<String>,
-    separators: Vec<String>,
-    prefix: String,
-    suffix: String,
-    fuzzy_distance: u8,
-    distance_budget: u32,
-    strict_separators: bool,
+    trigram_sources: Vec<String>,
+    verification: VerificationMode,
     highlight_sink: Option<Arc<HighlightSink>>,
     bm25_weight: Bm25Weight,
 }
@@ -221,30 +240,50 @@ impl Weight for NgramContainsWeight {
         let raw_inverted = reader.inverted_index(self.raw_field)?;
         let ngram_inverted = reader.inverted_index(self.ngram_field)?;
 
-        // Collect candidate doc_ids for each query token.
-        let mut per_token_candidates: Vec<Vec<DocId>> = Vec::new();
-
-        for token in &self.tokens {
-            // Level 1: Exact lookup in raw field.
-            let term = Term::from_field_text(self.raw_field, token);
-            let exact_docs = collect_posting_docs(&raw_inverted, &term)?;
-            if !exact_docs.is_empty() {
-                per_token_candidates.push(exact_docs);
-                continue;
+        let final_candidates = match &self.verification {
+            VerificationMode::Fuzzy(params) => {
+                // Fuzzy mode: exact lookup first, then ngram, intersect across tokens.
+                let mut per_token_candidates: Vec<Vec<DocId>> = Vec::new();
+                for source in &self.trigram_sources {
+                    let term = Term::from_field_text(self.raw_field, source);
+                    let exact_docs = collect_posting_docs(&raw_inverted, &term)?;
+                    if !exact_docs.is_empty() {
+                        per_token_candidates.push(exact_docs);
+                        continue;
+                    }
+                    let candidates = ngram_candidates_for_token(
+                        source,
+                        self.ngram_field,
+                        &ngram_inverted,
+                        params.fuzzy_distance,
+                    )?;
+                    per_token_candidates.push(candidates);
+                }
+                intersect_sorted_vecs(per_token_candidates)
             }
-
-            // Level 2: Ngram lookup with threshold-based intersection.
-            let candidates = ngram_candidates_for_token(
-                token,
-                self.ngram_field,
-                &ngram_inverted,
-                self.fuzzy_distance,
-            )?;
-            per_token_candidates.push(candidates);
-        }
-
-        // Intersect across all tokens.
-        let final_candidates = intersect_sorted_vecs(per_token_candidates);
+            VerificationMode::Regex(params) => {
+                if self.trigram_sources.is_empty() {
+                    // No usable trigrams (literals < 3 chars): full segment scan.
+                    // All docs are candidates; regex verification will filter.
+                    (0..reader.max_doc()).collect()
+                } else {
+                    // Ngram lookup: union across literals (alternatives).
+                    let mut all_candidates: Vec<DocId> = Vec::new();
+                    for source in &self.trigram_sources {
+                        let candidates = ngram_candidates_for_token(
+                            source,
+                            self.ngram_field,
+                            &ngram_inverted,
+                            params.fuzzy_distance,
+                        )?;
+                        all_candidates.extend(candidates);
+                    }
+                    all_candidates.sort_unstable();
+                    all_candidates.dedup();
+                    all_candidates
+                }
+            }
+        };
 
         if final_candidates.is_empty() {
             return Ok(Box::new(EmptyScorer));
@@ -269,13 +308,7 @@ impl Weight for NgramContainsWeight {
             final_candidates,
             store_reader,
             text_field,
-            self.tokens.clone(),
-            self.separators.clone(),
-            self.prefix.clone(),
-            self.suffix.clone(),
-            self.fuzzy_distance,
-            self.distance_budget,
-            self.strict_separators,
+            self.verification.clone(),
             self.bm25_weight.boost_by(boost),
             fieldnorm_reader,
             self.highlight_sink.clone(),
@@ -294,6 +327,277 @@ impl Weight for NgramContainsWeight {
     }
 }
 
+// ─── Fuzzy Verification ─────────────────────────────────────────────────────
+
+/// Count all matching positions for a single-token fuzzy query.
+fn count_single_token_fuzzy(
+    stored_text: &str,
+    doc_tokens: &[(usize, usize)],
+    params: &FuzzyParams,
+    highlight_sink: &Option<Arc<HighlightSink>>,
+    segment_ord: u32,
+    doc_id: DocId,
+) -> u32 {
+    let query_token = &params.tokens[0];
+    let mut count = 0u32;
+
+    for &(start, end) in doc_tokens {
+        let doc_token = stored_text[start..end].to_lowercase();
+
+        let distance = match token_match_distance(&doc_token, query_token, params.fuzzy_distance) {
+            Some(d) => d,
+            None => continue,
+        };
+
+        let mut total_distance = distance;
+
+        // Validate prefix.
+        if !params.prefix.is_empty() {
+            if params.strict_separators {
+                let prefix_len = params.prefix.len();
+                let doc_prefix_start = start.saturating_sub(prefix_len);
+                let doc_prefix = &stored_text[doc_prefix_start..start];
+                total_distance += edit_distance(&params.prefix, doc_prefix);
+                if total_distance > params.distance_budget {
+                    continue;
+                }
+            } else {
+                if start == 0 {
+                    continue;
+                }
+                if stored_text.as_bytes()[start - 1].is_ascii_alphanumeric() {
+                    continue;
+                }
+            }
+        }
+
+        // Validate suffix.
+        if !params.suffix.is_empty() {
+            if params.strict_separators {
+                let suffix_len = params.suffix.len();
+                let doc_suffix_end = min(end + suffix_len, stored_text.len());
+                let doc_suffix = &stored_text[end..doc_suffix_end];
+                total_distance += edit_distance(&params.suffix, doc_suffix);
+                if total_distance > params.distance_budget {
+                    continue;
+                }
+            } else {
+                if end >= stored_text.len() {
+                    continue;
+                }
+                if stored_text.as_bytes()[end].is_ascii_alphanumeric() {
+                    continue;
+                }
+            }
+        }
+
+        count += 1;
+        if let Some(sink) = highlight_sink {
+            sink.insert(segment_ord, doc_id, vec![[start, end]]);
+        }
+    }
+    count
+}
+
+/// Count all matching positions for a multi-token fuzzy query.
+fn count_multi_token_fuzzy(
+    stored_text: &str,
+    doc_tokens: &[(usize, usize)],
+    params: &FuzzyParams,
+    highlight_sink: &Option<Arc<HighlightSink>>,
+    segment_ord: u32,
+    doc_id: DocId,
+) -> u32 {
+    let num_query = params.tokens.len();
+    if doc_tokens.len() < num_query {
+        return 0;
+    }
+
+    let mut count = 0u32;
+    for start_idx in 0..=(doc_tokens.len() - num_query) {
+        if check_at_position_fuzzy(
+            stored_text,
+            doc_tokens,
+            start_idx,
+            params,
+            highlight_sink,
+            segment_ord,
+            doc_id,
+        ) {
+            count += 1;
+        }
+    }
+    count
+}
+
+/// Check if a multi-token fuzzy query matches at a specific position.
+fn check_at_position_fuzzy(
+    stored_text: &str,
+    doc_tokens: &[(usize, usize)],
+    start_idx: usize,
+    params: &FuzzyParams,
+    highlight_sink: &Option<Arc<HighlightSink>>,
+    segment_ord: u32,
+    doc_id: DocId,
+) -> bool {
+    let mut total_distance = 0u32;
+
+    // Check each query token matches the corresponding doc token.
+    for (q_idx, query_token) in params.tokens.iter().enumerate() {
+        let (start, end) = doc_tokens[start_idx + q_idx];
+        let doc_token = stored_text[start..end].to_lowercase();
+
+        match token_match_distance(&doc_token, query_token, params.fuzzy_distance) {
+            Some(d) => total_distance += d,
+            None => return false,
+        }
+
+        if total_distance > params.distance_budget {
+            return false;
+        }
+    }
+
+    // Validate separators between consecutive tokens.
+    for (sep_idx, query_sep) in params.separators.iter().enumerate() {
+        let (_, end_i) = doc_tokens[start_idx + sep_idx];
+        let (start_next, _) = doc_tokens[start_idx + sep_idx + 1];
+        if end_i > stored_text.len() || start_next > stored_text.len() || end_i > start_next {
+            return false;
+        }
+        let doc_sep = &stored_text[end_i..start_next];
+        if params.strict_separators {
+            total_distance += edit_distance(query_sep, doc_sep);
+            if total_distance > params.distance_budget {
+                return false;
+            }
+        } else if doc_sep.is_empty() || !doc_sep.bytes().any(|b| !b.is_ascii_alphanumeric()) {
+            return false;
+        }
+    }
+
+    // Validate prefix.
+    if !params.prefix.is_empty() {
+        let (first_start, _) = doc_tokens[start_idx];
+        if params.strict_separators {
+            let prefix_len = params.prefix.len();
+            let doc_prefix_start = first_start.saturating_sub(prefix_len);
+            let doc_prefix = &stored_text[doc_prefix_start..first_start];
+            total_distance += edit_distance(&params.prefix, doc_prefix);
+            if total_distance > params.distance_budget {
+                return false;
+            }
+        } else {
+            if first_start == 0 {
+                return false;
+            }
+            let before = &stored_text[..first_start];
+            if before
+                .as_bytes()
+                .last()
+                .is_none_or(|b| b.is_ascii_alphanumeric())
+            {
+                return false;
+            }
+        }
+    }
+
+    // Validate suffix.
+    if !params.suffix.is_empty() {
+        let num_query = params.tokens.len();
+        let (_, last_end) = doc_tokens[start_idx + num_query - 1];
+        if params.strict_separators {
+            let suffix_len = params.suffix.len();
+            let doc_suffix_end = min(last_end + suffix_len, stored_text.len());
+            let doc_suffix = &stored_text[last_end..doc_suffix_end];
+            total_distance += edit_distance(&params.suffix, doc_suffix);
+            if total_distance > params.distance_budget {
+                return false;
+            }
+        } else {
+            if last_end >= stored_text.len() {
+                return false;
+            }
+            if stored_text.as_bytes()[last_end].is_ascii_alphanumeric() {
+                return false;
+            }
+        }
+    }
+
+    if let Some(sink) = highlight_sink {
+        let offsets: Vec<[usize; 2]> = (0..params.tokens.len())
+            .map(|i| {
+                let (s, e) = doc_tokens[start_idx + i];
+                [s, e]
+            })
+            .collect();
+        sink.insert(segment_ord, doc_id, offsets);
+    }
+    true
+}
+
+// ─── Regex Verification ──────────────────────────────────────────────────────
+
+/// Verify a candidate document using regex (pure or hybrid with fuzzy on literals).
+///
+/// - Pure regex (`fuzzy_distance == 0`): run `compiled.find_iter()` on stored text.
+/// - Hybrid (`fuzzy_distance > 0`): also try fuzzy matching on extracted literals;
+///   `tf = max(tf_regex, tf_fuzzy)`.
+fn verify_regex(
+    stored_text: &str,
+    params: &RegexParams,
+    highlight_sink: &Option<Arc<HighlightSink>>,
+    segment_ord: u32,
+    doc_id: DocId,
+) -> u32 {
+    // 1. Regex exact verification
+    let regex_matches: Vec<regex::Match> = params.compiled.find_iter(stored_text).collect();
+    let tf_regex = regex_matches.len() as u32;
+
+    // 2. Hybrid fuzzy verification on extracted literals (if distance > 0)
+    let tf_fuzzy = if params.fuzzy_distance > 0 && !params.literals.is_empty() {
+        let doc_tokens = tokenize_raw(stored_text);
+        // For each literal, count fuzzy matches in the document tokens.
+        // Use the max across all literals (each literal is an alternative).
+        params
+            .literals
+            .iter()
+            .map(|lit| {
+                let lit_lower = lit.to_lowercase();
+                let mut count = 0u32;
+                for &(start, end) in &doc_tokens {
+                    let doc_token = stored_text[start..end].to_lowercase();
+                    if token_match_distance(&doc_token, &lit_lower, params.fuzzy_distance).is_some()
+                    {
+                        count += 1;
+                    }
+                }
+                count
+            })
+            .max()
+            .unwrap_or(0)
+    } else {
+        0
+    };
+
+    let tf = max(tf_regex, tf_fuzzy);
+
+    // Highlights: prefer regex offsets if available, otherwise no offsets for fuzzy-only matches.
+    if tf > 0 {
+        if let Some(sink) = highlight_sink {
+            if tf_regex > 0 {
+                let offsets: Vec<[usize; 2]> = regex_matches
+                    .iter()
+                    .map(|m| [m.start(), m.end()])
+                    .collect();
+                sink.insert(segment_ord, doc_id, offsets);
+            }
+            // When only fuzzy matched (tf_regex == 0), we don't have precise byte offsets.
+        }
+    }
+
+    tf
+}
+
 // ─── Scorer ────────────────────────────────────────────────────────────────
 
 struct NgramContainsScorer {
@@ -301,13 +605,7 @@ struct NgramContainsScorer {
     cursor: usize,
     store_reader: crate::store::StoreReader,
     text_field: Field,
-    tokens: Vec<String>,
-    separators: Vec<String>,
-    prefix: String,
-    suffix: String,
-    fuzzy_distance: u8,
-    distance_budget: u32,
-    strict_separators: bool,
+    verification: VerificationMode,
     bm25_weight: Bm25Weight,
     fieldnorm_reader: FieldNormReader,
     last_tf: u32,
@@ -320,13 +618,7 @@ impl NgramContainsScorer {
         candidates: Vec<DocId>,
         store_reader: crate::store::StoreReader,
         text_field: Field,
-        tokens: Vec<String>,
-        separators: Vec<String>,
-        prefix: String,
-        suffix: String,
-        fuzzy_distance: u8,
-        distance_budget: u32,
-        strict_separators: bool,
+        verification: VerificationMode,
         bm25_weight: Bm25Weight,
         fieldnorm_reader: FieldNormReader,
         highlight_sink: Option<Arc<HighlightSink>>,
@@ -337,13 +629,7 @@ impl NgramContainsScorer {
             cursor: 0,
             store_reader,
             text_field,
-            tokens,
-            separators,
-            prefix,
-            suffix,
-            fuzzy_distance,
-            distance_budget,
-            strict_separators,
+            verification,
             bm25_weight,
             fieldnorm_reader,
             last_tf: 0,
@@ -358,7 +644,7 @@ impl NgramContainsScorer {
     }
 
     /// Verify the current candidate doc by reading stored text.
-    /// Counts all matches (term frequency) and stores in `last_tf`.
+    /// Dispatches to the appropriate verification mode.
     fn verify(&mut self) -> bool {
         self.last_tf = 0;
         let doc_id = self.doc();
@@ -375,196 +661,41 @@ impl NgramContainsScorer {
             None => return false,
         };
 
-        let doc_tokens = tokenize_raw(stored_text);
-
-        let tf = if self.tokens.len() == 1 {
-            self.count_single_token(stored_text, &doc_tokens)
-        } else {
-            self.count_multi_token(stored_text, &doc_tokens)
+        let tf = match &self.verification {
+            VerificationMode::Fuzzy(params) => {
+                let doc_tokens = tokenize_raw(stored_text);
+                if params.tokens.len() == 1 {
+                    count_single_token_fuzzy(
+                        stored_text,
+                        &doc_tokens,
+                        params,
+                        &self.highlight_sink,
+                        self.segment_ord,
+                        doc_id,
+                    )
+                } else {
+                    count_multi_token_fuzzy(
+                        stored_text,
+                        &doc_tokens,
+                        params,
+                        &self.highlight_sink,
+                        self.segment_ord,
+                        doc_id,
+                    )
+                }
+            }
+            VerificationMode::Regex(params) => {
+                verify_regex(
+                    stored_text,
+                    params,
+                    &self.highlight_sink,
+                    self.segment_ord,
+                    doc_id,
+                )
+            }
         };
         self.last_tf = tf;
         tf > 0
-    }
-
-    /// Count all matching positions for a single-token query.
-    fn count_single_token(&self, stored_text: &str, doc_tokens: &[(usize, usize)]) -> u32 {
-        let query_token = &self.tokens[0];
-        let mut count = 0u32;
-
-        for &(start, end) in doc_tokens {
-            let doc_token = stored_text[start..end].to_lowercase();
-
-            let distance = match token_match_distance(&doc_token, query_token, self.fuzzy_distance)
-            {
-                Some(d) => d,
-                None => continue,
-            };
-
-            let mut total_distance = distance;
-
-            // Validate prefix.
-            if !self.prefix.is_empty() {
-                if self.strict_separators {
-                    let prefix_len = self.prefix.len();
-                    let doc_prefix_start = start.saturating_sub(prefix_len);
-                    let doc_prefix = &stored_text[doc_prefix_start..start];
-                    total_distance += edit_distance(&self.prefix, doc_prefix);
-                    if total_distance > self.distance_budget {
-                        continue;
-                    }
-                } else {
-                    if start == 0 {
-                        continue;
-                    }
-                    if stored_text.as_bytes()[start - 1].is_ascii_alphanumeric() {
-                        continue;
-                    }
-                }
-            }
-
-            // Validate suffix.
-            if !self.suffix.is_empty() {
-                if self.strict_separators {
-                    let suffix_len = self.suffix.len();
-                    let doc_suffix_end = min(end + suffix_len, stored_text.len());
-                    let doc_suffix = &stored_text[end..doc_suffix_end];
-                    total_distance += edit_distance(&self.suffix, doc_suffix);
-                    if total_distance > self.distance_budget {
-                        continue;
-                    }
-                } else {
-                    if end >= stored_text.len() {
-                        continue;
-                    }
-                    if stored_text.as_bytes()[end].is_ascii_alphanumeric() {
-                        continue;
-                    }
-                }
-            }
-
-            count += 1;
-            if let Some(ref sink) = self.highlight_sink {
-                sink.insert(self.segment_ord, self.doc(), vec![[start, end]]);
-            }
-        }
-        count
-    }
-
-    /// Count all matching positions for a multi-token query.
-    fn count_multi_token(&self, stored_text: &str, doc_tokens: &[(usize, usize)]) -> u32 {
-        let num_query = self.tokens.len();
-        if doc_tokens.len() < num_query {
-            return 0;
-        }
-
-        let mut count = 0u32;
-        for start_idx in 0..=(doc_tokens.len() - num_query) {
-            if self.check_at_position(stored_text, doc_tokens, start_idx) {
-                count += 1;
-            }
-        }
-        count
-    }
-
-    fn check_at_position(
-        &self,
-        stored_text: &str,
-        doc_tokens: &[(usize, usize)],
-        start_idx: usize,
-    ) -> bool {
-        let mut total_distance = 0u32;
-
-        // Check each query token matches the corresponding doc token.
-        for (q_idx, query_token) in self.tokens.iter().enumerate() {
-            let (start, end) = doc_tokens[start_idx + q_idx];
-            let doc_token = stored_text[start..end].to_lowercase();
-
-            match token_match_distance(&doc_token, query_token, self.fuzzy_distance) {
-                Some(d) => total_distance += d,
-                None => return false,
-            }
-
-            if total_distance > self.distance_budget {
-                return false;
-            }
-        }
-
-        // Validate separators between consecutive tokens.
-        for (sep_idx, query_sep) in self.separators.iter().enumerate() {
-            let (_, end_i) = doc_tokens[start_idx + sep_idx];
-            let (start_next, _) = doc_tokens[start_idx + sep_idx + 1];
-            if end_i > stored_text.len() || start_next > stored_text.len() || end_i > start_next {
-                return false;
-            }
-            let doc_sep = &stored_text[end_i..start_next];
-            if self.strict_separators {
-                total_distance += edit_distance(query_sep, doc_sep);
-                if total_distance > self.distance_budget {
-                    return false;
-                }
-            } else if doc_sep.is_empty() || !doc_sep.bytes().any(|b| !b.is_ascii_alphanumeric()) {
-                return false;
-            }
-        }
-
-        // Validate prefix.
-        if !self.prefix.is_empty() {
-            let (first_start, _) = doc_tokens[start_idx];
-            if self.strict_separators {
-                let prefix_len = self.prefix.len();
-                let doc_prefix_start = first_start.saturating_sub(prefix_len);
-                let doc_prefix = &stored_text[doc_prefix_start..first_start];
-                total_distance += edit_distance(&self.prefix, doc_prefix);
-                if total_distance > self.distance_budget {
-                    return false;
-                }
-            } else {
-                if first_start == 0 {
-                    return false;
-                }
-                let before = &stored_text[..first_start];
-                if before
-                    .as_bytes()
-                    .last()
-                    .is_none_or(|b| b.is_ascii_alphanumeric())
-                {
-                    return false;
-                }
-            }
-        }
-
-        // Validate suffix.
-        if !self.suffix.is_empty() {
-            let num_query = self.tokens.len();
-            let (_, last_end) = doc_tokens[start_idx + num_query - 1];
-            if self.strict_separators {
-                let suffix_len = self.suffix.len();
-                let doc_suffix_end = min(last_end + suffix_len, stored_text.len());
-                let doc_suffix = &stored_text[last_end..doc_suffix_end];
-                total_distance += edit_distance(&self.suffix, doc_suffix);
-                if total_distance > self.distance_budget {
-                    return false;
-                }
-            } else {
-                if last_end >= stored_text.len() {
-                    return false;
-                }
-                if stored_text.as_bytes()[last_end].is_ascii_alphanumeric() {
-                    return false;
-                }
-            }
-        }
-
-        if let Some(ref sink) = self.highlight_sink {
-            let offsets: Vec<[usize; 2]> = (0..self.tokens.len())
-                .map(|i| {
-                    let (s, e) = doc_tokens[start_idx + i];
-                    [s, e]
-                })
-                .collect();
-            sink.insert(self.segment_ord, self.doc(), offsets);
-        }
-        true
     }
 }
 
@@ -607,5 +738,112 @@ impl Scorer for NgramContainsScorer {
         let doc = self.doc();
         let fieldnorm_id = self.fieldnorm_reader.fieldnorm_id(doc);
         self.bm25_weight.score(fieldnorm_id, self.last_tf)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_regex_params(pattern: &str, literals: Vec<&str>, fuzzy_distance: u8) -> RegexParams {
+        RegexParams {
+            compiled: Regex::new(&format!("(?i){pattern}")).unwrap(),
+            literals: literals.into_iter().map(|s| s.to_string()).collect(),
+            fuzzy_distance,
+        }
+    }
+
+    // ─── verify_regex: pure regex ────────────────────────────────────────
+
+    #[test]
+    fn test_regex_pure_match() {
+        let params = make_regex_params(r"program[a-z]+", vec!["program"], 0);
+        let tf = verify_regex("Rust is a systems programming language", &params, &None, 0, 0);
+        assert_eq!(tf, 1); // "programming" matches
+    }
+
+    #[test]
+    fn test_regex_pure_no_match() {
+        let params = make_regex_params(r"program[a-z]+", vec!["program"], 0);
+        let tf = verify_regex("the cat sat on the mat", &params, &None, 0, 0);
+        assert_eq!(tf, 0);
+    }
+
+    #[test]
+    fn test_regex_pure_multiple_matches() {
+        let params = make_regex_params(r"program[a-z]+", vec!["program"], 0);
+        let tf = verify_regex(
+            "Programming in Rust: a programmer's guide to programming",
+            &params,
+            &None,
+            0,
+            0,
+        );
+        assert_eq!(tf, 3); // "Programming", "programmer", "programming"
+    }
+
+    #[test]
+    fn test_regex_case_insensitive() {
+        let params = make_regex_params(r"rust", vec!["rust"], 0);
+        let tf = verify_regex("Rust is great", &params, &None, 0, 0);
+        assert_eq!(tf, 1);
+    }
+
+    // ─── verify_regex: hybrid (regex + fuzzy) ────────────────────────────
+
+    #[test]
+    fn test_regex_hybrid_typo_in_pattern() {
+        // Pattern has typo "programing" (one m) — regex won't match "programming"
+        // but fuzzy on literal "programing" with distance=1 should match.
+        let params = make_regex_params(r"programing[a-z]+", vec!["programing"], 1);
+        let tf = verify_regex("Rust is a systems programming language", &params, &None, 0, 0);
+        assert!(tf > 0, "hybrid should match via fuzzy on literal");
+    }
+
+    #[test]
+    fn test_regex_hybrid_exact_wins() {
+        // Pattern is correct — regex matches directly, fuzzy also matches.
+        // tf = max(regex, fuzzy).
+        let params = make_regex_params(r"program[a-z]+", vec!["program"], 1);
+        let tf = verify_regex("Rust programming is fun", &params, &None, 0, 0);
+        assert!(tf > 0);
+    }
+
+    #[test]
+    fn test_regex_hybrid_no_match() {
+        let params = make_regex_params(r"python[a-z]+", vec!["python"], 1);
+        let tf = verify_regex("Rust is a systems programming language", &params, &None, 0, 0);
+        assert_eq!(tf, 0);
+    }
+
+    // ─── verify_regex: highlights ────────────────────────────────────────
+
+    #[test]
+    fn test_regex_highlights() {
+        let sink = Arc::new(HighlightSink::new());
+        let params = make_regex_params(r"program[a-z]+", vec!["program"], 0);
+        let text = "Rust programming is fun";
+        let tf = verify_regex(text, &params, &Some(sink.clone()), 0, 42);
+        assert_eq!(tf, 1);
+        let offsets = sink.get(0, 42).expect("should have highlights");
+        assert_eq!(offsets.len(), 1);
+        // "programming" starts at index 5 in "Rust programming is fun"
+        assert_eq!(offsets[0], [5, 16]);
+    }
+
+    // ─── verify_regex: edge cases ────────────────────────────────────────
+
+    #[test]
+    fn test_regex_empty_text() {
+        let params = make_regex_params(r"program[a-z]+", vec!["program"], 0);
+        let tf = verify_regex("", &params, &None, 0, 0);
+        assert_eq!(tf, 0);
+    }
+
+    #[test]
+    fn test_regex_dot_star() {
+        let params = make_regex_params(r".*", vec![], 0);
+        let tf = verify_regex("anything", &params, &None, 0, 0);
+        assert!(tf > 0); // .* matches everything
     }
 }
