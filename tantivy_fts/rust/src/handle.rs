@@ -53,6 +53,23 @@ pub struct TantivyHandle {
 /// Default writer heap size (50MB).
 const WRITER_HEAP_SIZE: usize = 50_000_000;
 
+/// Create an IndexWriter with a thread count appropriate for the target.
+/// On WASM, limit to 1 thread to avoid exhausting the emscripten pthread pool.
+fn create_writer(index: &Index) -> Result<IndexWriter, String> {
+    #[cfg(target_arch = "wasm32")]
+    {
+        index
+            .writer_with_num_threads(1, WRITER_HEAP_SIZE)
+            .map_err(|e| format!("cannot create writer: {e}"))
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        index
+            .writer(WRITER_HEAP_SIZE)
+            .map_err(|e| format!("cannot create writer: {e}"))
+    }
+}
+
 /// Config file stored alongside the index for reopening.
 const CONFIG_FILE: &str = "_config.json";
 
@@ -73,9 +90,7 @@ impl TantivyHandle {
         std::fs::write(Path::new(path).join(CONFIG_FILE), config_json)
             .map_err(|e| format!("cannot write config: {e}"))?;
 
-        let writer = index
-            .writer(WRITER_HEAP_SIZE)
-            .map_err(|e| format!("cannot create writer: {e}"))?;
+        let writer = create_writer(&index)?;
         let reader = index
             .reader_builder()
             .reload_policy(ReloadPolicy::Manual)
@@ -135,9 +150,7 @@ impl TantivyHandle {
             .map(|(field, entry)| (entry.name().to_string(), field))
             .collect();
 
-        let writer = index
-            .writer(WRITER_HEAP_SIZE)
-            .map_err(|e| format!("cannot create writer: {e}"))?;
+        let writer = create_writer(&index)?;
         let reader = index
             .reader_builder()
             .reload_policy(ReloadPolicy::Manual)
@@ -174,8 +187,9 @@ fn build_schema(
     let mut ngram_field_pairs = Vec::new();
     let has_stemmer = config.stemmer.is_some();
 
-    // Auto-add _node_id as u64 FAST + INDEXED field for filtered search.
-    let node_id_field = builder.add_u64_field(NODE_ID_FIELD, FAST | INDEXED);
+    // Auto-add _node_id as u64 FAST + INDEXED + STORED field.
+    // STORED is required so that extract_node_id() can read it back from documents.
+    let node_id_field = builder.add_u64_field(NODE_ID_FIELD, FAST | INDEXED | STORED);
     field_map.push((NODE_ID_FIELD.to_string(), node_id_field));
 
     for field_def in &config.fields {
@@ -256,6 +270,21 @@ fn build_schema(
                     opts = opts | FAST;
                 }
                 let field = builder.add_i64_field(&field_def.name, opts);
+                field_map.push((field_def.name.clone(), field));
+            }
+            "f64" => {
+                use ld_tantivy::schema::{NumericOptions, FAST, INDEXED};
+                let mut opts = NumericOptions::default();
+                if field_def.stored.unwrap_or(true) {
+                    opts = opts | STORED;
+                }
+                if field_def.indexed.unwrap_or(false) {
+                    opts = opts | INDEXED;
+                }
+                if field_def.fast.unwrap_or(false) {
+                    opts = opts | FAST;
+                }
+                let field = builder.add_f64_field(&field_def.name, opts);
                 field_map.push((field_def.name.clone(), field));
             }
             "string" => {

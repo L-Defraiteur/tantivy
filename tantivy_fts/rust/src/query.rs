@@ -5,13 +5,14 @@
 //!   - term, fuzzy, regex       → raw field (precision: exact word forms, lowercase only)
 //! The user always references the base field name; routing is transparent.
 
+use std::ops::Bound;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
 use ld_tantivy::query::{
     AutomatonPhraseQuery, BooleanQuery, FuzzyTermQuery, HighlightSink, NgramContainsQuery, Occur,
-    PhraseQuery, Query, QueryParser, RegexQuery, TermQuery,
+    PhraseQuery, Query, QueryParser, RangeQuery, RegexQuery, TermQuery,
 };
 use ld_tantivy::schema::{Field, FieldType, IndexRecordOption, Schema, Term};
 use ld_tantivy::Index;
@@ -38,6 +39,13 @@ pub struct FieldDef {
 // ─── Query Config ───────────────────────────────────────────────────────────
 
 #[derive(Deserialize)]
+pub struct FilterClause {
+    pub field: String,
+    pub op: String, // "eq", "ne", "lt", "lte", "gt", "gte", "in"
+    pub value: serde_json::Value,
+}
+
+#[derive(Deserialize)]
 pub struct QueryConfig {
     #[serde(rename = "type")]
     pub query_type: String,
@@ -52,6 +60,8 @@ pub struct QueryConfig {
     pub must: Option<Vec<QueryConfig>>,
     pub should: Option<Vec<QueryConfig>>,
     pub must_not: Option<Vec<QueryConfig>>,
+    // Filter clauses on non-text fields
+    pub filters: Option<Vec<FilterClause>>,
 }
 
 // ─── Tokenization Helper ────────────────────────────────────────────────────
@@ -162,7 +172,7 @@ pub fn build_query(
     ngram_pairs: &[(String, String)],
     highlight_sink: Option<Arc<HighlightSink>>,
 ) -> Result<Box<dyn Query>, String> {
-    match config.query_type.as_str() {
+    let text_query = match config.query_type.as_str() {
         "term" => build_term_query(config, schema, index, raw_pairs, highlight_sink),
         "fuzzy" => build_fuzzy_query(config, schema, index, raw_pairs, highlight_sink),
         "phrase" => build_phrase_query(config, schema, index, raw_pairs, highlight_sink),
@@ -173,7 +183,21 @@ pub fn build_query(
         "boolean" => build_boolean_query(config, schema, index, raw_pairs, ngram_pairs),
         "parse" => build_parsed_query(config, schema, index),
         other => Err(format!("unknown query type: {other}")),
+    }?;
+
+    // Wrap with filter clauses if present.
+    if let Some(ref filters) = config.filters {
+        if !filters.is_empty() {
+            let mut clauses: Vec<(Occur, Box<dyn Query>)> = Vec::new();
+            clauses.push((Occur::Must, text_query));
+            for filter in filters {
+                clauses.push((Occur::Must, build_filter_clause(filter, schema)?));
+            }
+            return Ok(Box::new(BooleanQuery::new(clauses)));
+        }
     }
+
+    Ok(text_query)
 }
 
 /// Term query: exact token match on raw field (lowercased only, no stemming).
@@ -462,5 +486,82 @@ fn build_parsed_query(
     parser
         .parse_query(value)
         .map_err(|e| format!("query parse error: {e}"))
+}
+
+// ─── Filter Clause Building ────────────────────────────────────────────────
+
+/// Helper: extract a JSON value as the appropriate Term for a given field type.
+fn json_to_term(field: Field, field_type: &FieldType, value: &serde_json::Value) -> Result<Term, String> {
+    match field_type {
+        FieldType::U64(_) => {
+            let v = value.as_u64().ok_or_else(|| format!("expected u64 value, got {value}"))?;
+            Ok(Term::from_field_u64(field, v))
+        }
+        FieldType::I64(_) => {
+            let v = value.as_i64().ok_or_else(|| format!("expected i64 value, got {value}"))?;
+            Ok(Term::from_field_i64(field, v))
+        }
+        FieldType::F64(_) => {
+            let v = value.as_f64().ok_or_else(|| format!("expected f64 value, got {value}"))?;
+            Ok(Term::from_field_f64(field, v))
+        }
+        FieldType::Str(_) => {
+            let v = value.as_str().ok_or_else(|| format!("expected string value, got {value}"))?;
+            Ok(Term::from_field_text(field, v))
+        }
+        _ => Err(format!("unsupported field type for filter")),
+    }
+}
+
+fn build_filter_clause(filter: &FilterClause, schema: &Schema) -> Result<Box<dyn Query>, String> {
+    let field = schema
+        .get_field(&filter.field)
+        .map_err(|_| format!("unknown filter field: {}", filter.field))?;
+    let field_type = schema.get_field_entry(field).field_type().clone();
+
+    match filter.op.as_str() {
+        "eq" => {
+            let term = json_to_term(field, &field_type, &filter.value)?;
+            Ok(Box::new(TermQuery::new(term, IndexRecordOption::Basic)))
+        }
+        "ne" => {
+            let term = json_to_term(field, &field_type, &filter.value)?;
+            let eq_query = TermQuery::new(term, IndexRecordOption::Basic);
+            Ok(Box::new(BooleanQuery::new(vec![
+                (Occur::MustNot, Box::new(eq_query) as Box<dyn Query>),
+            ])))
+        }
+        "lt" => {
+            let term = json_to_term(field, &field_type, &filter.value)?;
+            Ok(Box::new(RangeQuery::new(Bound::Unbounded, Bound::Excluded(term))))
+        }
+        "lte" => {
+            let term = json_to_term(field, &field_type, &filter.value)?;
+            Ok(Box::new(RangeQuery::new(Bound::Unbounded, Bound::Included(term))))
+        }
+        "gt" => {
+            let term = json_to_term(field, &field_type, &filter.value)?;
+            Ok(Box::new(RangeQuery::new(Bound::Excluded(term), Bound::Unbounded)))
+        }
+        "gte" => {
+            let term = json_to_term(field, &field_type, &filter.value)?;
+            Ok(Box::new(RangeQuery::new(Bound::Included(term), Bound::Unbounded)))
+        }
+        "in" => {
+            let values = filter.value.as_array().ok_or("'in' operator requires an array value")?;
+            let clauses: Vec<(Occur, Box<dyn Query>)> = values
+                .iter()
+                .map(|v| {
+                    let term = json_to_term(field, &field_type, v)?;
+                    Ok((Occur::Should, Box::new(TermQuery::new(term, IndexRecordOption::Basic)) as Box<dyn Query>))
+                })
+                .collect::<Result<Vec<_>, String>>()?;
+            if clauses.is_empty() {
+                return Err("'in' filter requires at least one value".to_string());
+            }
+            Ok(Box::new(BooleanQuery::new(clauses)))
+        }
+        other => Err(format!("unknown filter operator: {other}")),
+    }
 }
 
