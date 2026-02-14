@@ -179,6 +179,20 @@ This fork is used as a dependency of tantivy_fts, a C FFI crate that exposes ful
 ld-tantivy = { path = "../ld-tantivy", features = ["stopwords", "lz4-compression", "stemmer"] }
 ```
 
+### Rebuild after modifying ld-tantivy sources
+
+CMake does not detect changes in Rust source files. After modifying files in `src/`, you must manually rebuild the Rust static library and re-link the extension:
+
+```bash
+# 1. Rebuild Rust (from this directory)
+cargo build --release -p ld-tantivy -p tantivy-fts
+
+# 2. Re-link the extension shared lib (from rag3db/build/release/)
+cmake --build . --target rag3db_tantivy_fts_extension -j$(nproc)
+```
+
+See [`../../tantivy_fts/BUILD.md`](../../tantivy_fts/BUILD.md) for the full build guide.
+
 ## Lineage
 
 - [quickwit-oss/tantivy](https://github.com/quickwit-oss/tantivy) — original full-text search engine in Rust

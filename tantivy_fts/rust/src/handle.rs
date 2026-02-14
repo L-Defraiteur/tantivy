@@ -3,16 +3,17 @@
 //! Each TantivyHandle holds an Index, an IndexWriter, and an IndexReader.
 //! Handles are identified by opaque pointers passed through the C FFI.
 //!
-//! When a stemmer is configured, every "text" field gets a dual-field layout:
-//!   - `{name}` : tokenized + stemmed (for phrase/parse queries — recall)
-//!   - `{name}._raw` : lowercased only (for term/fuzzy/regex queries — precision)
+//! Every "text" field gets a triple-field layout:
+//!   - `{name}` : tokenized (stemmed if stemmer configured, else lowercase)
+//!   - `{name}._raw` : lowercased only (for term/fuzzy/regex/contains queries — precision)
+//!   - `{name}._ngram` : trigrams (for fast substring candidate generation in contains queries)
 //! The routing is transparent — users always reference the base field name.
 
 use std::path::Path;
 use std::sync::Mutex;
 
 use ld_tantivy::schema::{
-    Field, IndexRecordOption, Schema, TextFieldIndexing, TextOptions, FAST, INDEXED, STORED, TEXT,
+    Field, IndexRecordOption, Schema, TextFieldIndexing, TextOptions, FAST, INDEXED, STORED,
 };
 use ld_tantivy::{Index, IndexReader, IndexSettings, IndexWriter, ReloadPolicy};
 
@@ -43,10 +44,10 @@ pub struct TantivyHandle {
     /// Maps field names (including internal `._raw` names) to Field objects.
     pub field_map: Vec<(String, Field)>,
     /// Maps user field names to their `._raw` counterpart names.
-    /// Only populated when a stemmer is active and only for "text" fields.
+    /// Always populated for "text" fields.
     pub raw_field_pairs: Vec<(String, String)>,
     /// Maps user field names to their `._ngram` counterpart names.
-    /// Only populated when a stemmer is active and only for "text" fields.
+    /// Always populated for "text" fields.
     pub ngram_field_pairs: Vec<(String, String)>,
 }
 
@@ -122,24 +123,20 @@ impl TantivyHandle {
             let config: SchemaConfig = serde_json::from_str(&config_str)
                 .map_err(|e| format!("cannot parse config: {e}"))?;
             configure_tokenizers(&index, &config);
-            if config.stemmer.is_some() {
-                let text_fields: Vec<_> = config
-                    .fields
-                    .iter()
-                    .filter(|f| f.field_type == "text")
-                    .collect();
-                let raw: Vec<_> = text_fields
-                    .iter()
-                    .map(|f| (f.name.clone(), format!("{}{RAW_SUFFIX}", f.name)))
-                    .collect();
-                let ngram: Vec<_> = text_fields
-                    .iter()
-                    .map(|f| (f.name.clone(), format!("{}{NGRAM_SUFFIX}", f.name)))
-                    .collect();
-                (raw, ngram)
-            } else {
-                (Vec::new(), Vec::new())
-            }
+            let text_fields: Vec<_> = config
+                .fields
+                .iter()
+                .filter(|f| f.field_type == "text")
+                .collect();
+            let raw: Vec<_> = text_fields
+                .iter()
+                .map(|f| (f.name.clone(), format!("{}{RAW_SUFFIX}", f.name)))
+                .collect();
+            let ngram: Vec<_> = text_fields
+                .iter()
+                .map(|f| (f.name.clone(), format!("{}{NGRAM_SUFFIX}", f.name)))
+                .collect();
+            (raw, ngram)
         } else {
             (Vec::new(), Vec::new())
         };
@@ -195,52 +192,39 @@ fn build_schema(
     for field_def in &config.fields {
         match field_def.field_type.as_str() {
             "text" => {
-                if has_stemmer {
-                    // Stemmed field: uses "stemmed" tokenizer.
-                    // Uses WithFreqsAndPositionsAndOffsets so PhraseScorer can capture
-                    // byte offsets for highlighting (stemmer preserves original offsets).
-                    let indexing = TextFieldIndexing::default()
-                        .set_tokenizer(STEMMED_TOKENIZER)
-                        .set_index_option(IndexRecordOption::WithFreqsAndPositionsAndOffsets);
-                    let mut opts = TextOptions::default().set_indexing_options(indexing);
-                    if field_def.stored.unwrap_or(true) {
-                        opts = opts.set_stored();
-                    }
-                    let field = builder.add_text_field(&field_def.name, opts);
-                    field_map.push((field_def.name.clone(), field));
-
-                    // Raw counterpart: "default" tokenizer (lowercase only), NOT stored.
-                    // Uses WithFreqsAndPositionsAndOffsets so ContainsScorer can read
-                    // byte offsets directly from the index (no re-tokenization needed).
-                    let raw_indexing = TextFieldIndexing::default()
-                        .set_tokenizer("default")
-                        .set_index_option(IndexRecordOption::WithFreqsAndPositionsAndOffsets);
-                    let raw_opts = TextOptions::default().set_indexing_options(raw_indexing);
-                    let raw_name = format!("{}{RAW_SUFFIX}", field_def.name);
-                    let raw_field = builder.add_text_field(&raw_name, raw_opts);
-                    field_map.push((raw_name.clone(), raw_field));
-                    raw_field_pairs.push((field_def.name.clone(), raw_name));
-
-                    // N-gram counterpart: trigrams for fast substring candidate generation.
-                    // Uses IndexRecordOption::Basic (doc IDs only — no positions/offsets needed).
-                    let ngram_indexing = TextFieldIndexing::default()
-                        .set_tokenizer(NGRAM_TOKENIZER)
-                        .set_index_option(IndexRecordOption::Basic);
-                    let ngram_opts = TextOptions::default().set_indexing_options(ngram_indexing);
-                    let ngram_name = format!("{}{NGRAM_SUFFIX}", field_def.name);
-                    let ngram_field = builder.add_text_field(&ngram_name, ngram_opts);
-                    field_map.push((ngram_name.clone(), ngram_field));
-                    ngram_field_pairs.push((field_def.name.clone(), ngram_name));
-                } else {
-                    // No stemmer: single field with default tokenizer.
-                    let opts = if field_def.stored.unwrap_or(true) {
-                        TEXT | STORED
-                    } else {
-                        TEXT
-                    };
-                    let field = builder.add_text_field(&field_def.name, opts);
-                    field_map.push((field_def.name.clone(), field));
+                // Main field: stemmed tokenizer if stemmer configured, else "default" (lowercase).
+                let main_tokenizer = if has_stemmer { STEMMED_TOKENIZER } else { "default" };
+                let indexing = TextFieldIndexing::default()
+                    .set_tokenizer(main_tokenizer)
+                    .set_index_option(IndexRecordOption::WithFreqsAndPositionsAndOffsets);
+                let mut opts = TextOptions::default().set_indexing_options(indexing);
+                if field_def.stored.unwrap_or(true) {
+                    opts = opts.set_stored();
                 }
+                let field = builder.add_text_field(&field_def.name, opts);
+                field_map.push((field_def.name.clone(), field));
+
+                // Raw counterpart: "default" tokenizer (lowercase only), NOT stored.
+                // Used by term/fuzzy/regex/contains queries for precision matching.
+                let raw_indexing = TextFieldIndexing::default()
+                    .set_tokenizer("default")
+                    .set_index_option(IndexRecordOption::WithFreqsAndPositionsAndOffsets);
+                let raw_opts = TextOptions::default().set_indexing_options(raw_indexing);
+                let raw_name = format!("{}{RAW_SUFFIX}", field_def.name);
+                let raw_field = builder.add_text_field(&raw_name, raw_opts);
+                field_map.push((raw_name.clone(), raw_field));
+                raw_field_pairs.push((field_def.name.clone(), raw_name));
+
+                // N-gram counterpart: trigrams for fast substring candidate generation.
+                // Uses IndexRecordOption::Basic (doc IDs only — no positions/offsets needed).
+                let ngram_indexing = TextFieldIndexing::default()
+                    .set_tokenizer(NGRAM_TOKENIZER)
+                    .set_index_option(IndexRecordOption::Basic);
+                let ngram_opts = TextOptions::default().set_indexing_options(ngram_indexing);
+                let ngram_name = format!("{}{NGRAM_SUFFIX}", field_def.name);
+                let ngram_field = builder.add_text_field(&ngram_name, ngram_opts);
+                field_map.push((ngram_name.clone(), ngram_field));
+                ngram_field_pairs.push((field_def.name.clone(), ngram_name));
             }
             "u64" => {
                 use ld_tantivy::schema::{NumericOptions, FAST, INDEXED};
@@ -305,10 +289,20 @@ fn build_schema(
 }
 
 fn configure_tokenizers(index: &Index, config: &SchemaConfig) {
-    if let Some(ref stemmer_lang) = config.stemmer {
-        use ld_tantivy::tokenizer::{LowerCaser, SimpleTokenizer, Stemmer, TextAnalyzer};
+    use ld_tantivy::tokenizer::{LowerCaser, SimpleTokenizer, TextAnalyzer};
 
-        use crate::tokenizer::NgramFilter;
+    use crate::tokenizer::NgramFilter;
+
+    // N-gram tokenizer: always registered (used by ._ngram fields for contains queries).
+    let ngram_tokenizer = TextAnalyzer::builder(SimpleTokenizer::default())
+        .filter(LowerCaser)
+        .filter(NgramFilter)
+        .build();
+    index.tokenizers().register(NGRAM_TOKENIZER, ngram_tokenizer);
+
+    // Stemmer: only if requested.
+    if let Some(ref stemmer_lang) = config.stemmer {
+        use ld_tantivy::tokenizer::Stemmer;
 
         let lang = match stemmer_lang.as_str() {
             "english" => ld_tantivy::tokenizer::Language::English,
@@ -326,15 +320,6 @@ fn configure_tokenizers(index: &Index, config: &SchemaConfig) {
             .filter(LowerCaser)
             .filter(Stemmer::new(lang))
             .build();
-
-        // Register as "stemmed" — the "default" tokenizer stays untouched (lowercase only).
         index.tokenizers().register(STEMMED_TOKENIZER, tokenizer);
-
-        // N-gram tokenizer: SimpleTokenizer → lowercase → trigrams.
-        let ngram_tokenizer = TextAnalyzer::builder(SimpleTokenizer::default())
-            .filter(LowerCaser)
-            .filter(NgramFilter)
-            .build();
-        index.tokenizers().register(NGRAM_TOKENIZER, ngram_tokenizer);
     }
 }

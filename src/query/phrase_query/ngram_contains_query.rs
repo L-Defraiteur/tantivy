@@ -15,6 +15,8 @@ use super::scoring_utils::{
     edit_distance, generate_trigrams, intersect_sorted_vecs, ngram_threshold, token_match_distance,
     tokenize_raw, HighlightSink,
 };
+use crate::fieldnorm::FieldNormReader;
+use crate::query::bm25::Bm25Weight;
 use crate::query::{EmptyScorer, EnableScoring, Explanation, Query, Scorer, Weight};
 use crate::schema::document::Value;
 use crate::schema::{Field, IndexRecordOption, Term};
@@ -155,7 +157,26 @@ impl NgramContainsQuery {
 }
 
 impl Query for NgramContainsQuery {
-    fn weight(&self, _enable_scoring: EnableScoring) -> crate::Result<Box<dyn Weight>> {
+    fn weight(&self, enable_scoring: EnableScoring) -> crate::Result<Box<dyn Weight>> {
+        let bm25_weight = match enable_scoring {
+            EnableScoring::Enabled {
+                statistics_provider,
+                ..
+            } => {
+                let terms: Vec<Term> = self
+                    .tokens
+                    .iter()
+                    .map(|t| Term::from_field_text(self.raw_field, t))
+                    .collect();
+                if terms.is_empty() {
+                    Bm25Weight::for_one_term(0, 1, 1.0)
+                } else {
+                    Bm25Weight::for_terms(statistics_provider, &terms)?
+                }
+            }
+            EnableScoring::Disabled { .. } => Bm25Weight::for_one_term(0, 1, 1.0),
+        };
+
         Ok(Box::new(NgramContainsWeight {
             raw_field: self.raw_field,
             ngram_field: self.ngram_field,
@@ -168,6 +189,7 @@ impl Query for NgramContainsQuery {
             distance_budget: self.distance_budget,
             strict_separators: self.strict_separators,
             highlight_sink: self.highlight_sink.clone(),
+            bm25_weight,
         }))
     }
 }
@@ -186,6 +208,7 @@ struct NgramContainsWeight {
     distance_budget: u32,
     strict_separators: bool,
     highlight_sink: Option<Arc<HighlightSink>>,
+    bm25_weight: Bm25Weight,
 }
 
 impl Weight for NgramContainsWeight {
@@ -233,6 +256,15 @@ impl Weight for NgramContainsWeight {
             .map_err(crate::TantivyError::from)?;
         let text_field = self.stored_field.unwrap_or(self.raw_field);
 
+        let fieldnorm_reader = if let Some(fnr) = reader
+            .fieldnorms_readers()
+            .get_field(self.raw_field)?
+        {
+            fnr
+        } else {
+            FieldNormReader::constant(reader.max_doc(), 1)
+        };
+
         Ok(Box::new(NgramContainsScorer::new(
             final_candidates,
             store_reader,
@@ -244,7 +276,8 @@ impl Weight for NgramContainsWeight {
             self.fuzzy_distance,
             self.distance_budget,
             self.strict_separators,
-            boost,
+            self.bm25_weight.boost_by(boost),
+            fieldnorm_reader,
             self.highlight_sink.clone(),
             segment_ord,
         )))
@@ -275,7 +308,9 @@ struct NgramContainsScorer {
     fuzzy_distance: u8,
     distance_budget: u32,
     strict_separators: bool,
-    boost: Score,
+    bm25_weight: Bm25Weight,
+    fieldnorm_reader: FieldNormReader,
+    last_tf: u32,
     highlight_sink: Option<Arc<HighlightSink>>,
     segment_ord: u32,
 }
@@ -292,7 +327,8 @@ impl NgramContainsScorer {
         fuzzy_distance: u8,
         distance_budget: u32,
         strict_separators: bool,
-        boost: Score,
+        bm25_weight: Bm25Weight,
+        fieldnorm_reader: FieldNormReader,
         highlight_sink: Option<Arc<HighlightSink>>,
         segment_ord: u32,
     ) -> Self {
@@ -308,7 +344,9 @@ impl NgramContainsScorer {
             fuzzy_distance,
             distance_budget,
             strict_separators,
-            boost,
+            bm25_weight,
+            fieldnorm_reader,
+            last_tf: 0,
             highlight_sink,
             segment_ord,
         };
@@ -320,7 +358,9 @@ impl NgramContainsScorer {
     }
 
     /// Verify the current candidate doc by reading stored text.
-    fn verify(&self) -> bool {
+    /// Counts all matches (term frequency) and stores in `last_tf`.
+    fn verify(&mut self) -> bool {
+        self.last_tf = 0;
         let doc_id = self.doc();
         if doc_id == TERMINATED {
             return false;
@@ -337,14 +377,19 @@ impl NgramContainsScorer {
 
         let doc_tokens = tokenize_raw(stored_text);
 
-        if self.tokens.len() == 1 {
-            return self.verify_single_token(stored_text, &doc_tokens);
-        }
-        self.verify_multi_token(stored_text, &doc_tokens)
+        let tf = if self.tokens.len() == 1 {
+            self.count_single_token(stored_text, &doc_tokens)
+        } else {
+            self.count_multi_token(stored_text, &doc_tokens)
+        };
+        self.last_tf = tf;
+        tf > 0
     }
 
-    fn verify_single_token(&self, stored_text: &str, doc_tokens: &[(usize, usize)]) -> bool {
+    /// Count all matching positions for a single-token query.
+    fn count_single_token(&self, stored_text: &str, doc_tokens: &[(usize, usize)]) -> u32 {
         let query_token = &self.tokens[0];
+        let mut count = 0u32;
 
         for &(start, end) in doc_tokens {
             let doc_token = stored_text[start..end].to_lowercase();
@@ -397,29 +442,31 @@ impl NgramContainsScorer {
                 }
             }
 
+            count += 1;
             if let Some(ref sink) = self.highlight_sink {
                 sink.insert(self.segment_ord, self.doc(), vec![[start, end]]);
             }
-            return true;
         }
-        false
+        count
     }
 
-    fn verify_multi_token(&self, stored_text: &str, doc_tokens: &[(usize, usize)]) -> bool {
+    /// Count all matching positions for a multi-token query.
+    fn count_multi_token(&self, stored_text: &str, doc_tokens: &[(usize, usize)]) -> u32 {
         let num_query = self.tokens.len();
         if doc_tokens.len() < num_query {
-            return false;
+            return 0;
         }
 
+        let mut count = 0u32;
         for start_idx in 0..=(doc_tokens.len() - num_query) {
-            if self.verify_at_position(stored_text, doc_tokens, start_idx) {
-                return true;
+            if self.check_at_position(stored_text, doc_tokens, start_idx) {
+                count += 1;
             }
         }
-        false
+        count
     }
 
-    fn verify_at_position(
+    fn check_at_position(
         &self,
         stored_text: &str,
         doc_tokens: &[(usize, usize)],
@@ -557,6 +604,8 @@ impl DocSet for NgramContainsScorer {
 
 impl Scorer for NgramContainsScorer {
     fn score(&mut self) -> Score {
-        self.boost
+        let doc = self.doc();
+        let fieldnorm_id = self.fieldnorm_reader.fieldnorm_id(doc);
+        self.bm25_weight.score(fieldnorm_id, self.last_tf)
     }
 }
