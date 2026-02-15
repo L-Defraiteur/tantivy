@@ -316,4 +316,145 @@ mod tests {
     fn test_intersect_sorted_vecs_single() {
         assert_eq!(intersect_sorted_vecs(vec![vec![1, 2, 3]]), vec![1, 2, 3]);
     }
+
+    #[test]
+    fn test_intersect_sorted_vecs_disjoint() {
+        assert_eq!(
+            intersect_sorted_vecs(vec![vec![1, 3, 5], vec![2, 4, 6]]),
+            Vec::<DocId>::new()
+        );
+    }
+
+    #[test]
+    fn test_intersect_sorted_vecs_three() {
+        let a = vec![1, 2, 3, 5, 8];
+        let b = vec![2, 3, 5, 7];
+        let c = vec![3, 5, 9];
+        assert_eq!(intersect_sorted_vecs(vec![a, b, c]), vec![3, 5]);
+    }
+
+    // ─── generate_trigrams edge cases ──────────────────────────────────
+
+    #[test]
+    fn test_generate_trigrams_empty() {
+        assert_eq!(generate_trigrams(""), vec![""]);
+    }
+
+    #[test]
+    fn test_generate_trigrams_single_char() {
+        assert_eq!(generate_trigrams("a"), vec!["a"]);
+    }
+
+    #[test]
+    fn test_generate_trigrams_long() {
+        let trigrams = generate_trigrams("programming");
+        assert_eq!(trigrams.len(), 9); // 11 chars - 3 + 1 = 9 trigrams
+        assert_eq!(trigrams[0], "pro");
+        assert_eq!(trigrams[8], "ing");
+    }
+
+    // ─── token_match_distance edge cases ───────────────────────────────
+
+    #[test]
+    fn test_token_match_distance_substring() {
+        // "program" is a substring of "programming"
+        assert_eq!(token_match_distance("programming", "program", 0), Some(0));
+    }
+
+    #[test]
+    fn test_token_match_distance_fuzzy_substring() {
+        // "progam" is fuzzy-substring of "programming" (distance 1)
+        assert_eq!(token_match_distance("programming", "progam", 1), Some(1));
+    }
+
+    #[test]
+    fn test_token_match_distance_too_far() {
+        // "xyz" is more than 1 edit from any token
+        assert_eq!(token_match_distance("hello", "xyz", 1), None);
+    }
+
+    // ─── contains_fuzzy_substring edge cases ────────────────────────────
+
+    #[test]
+    fn test_contains_fuzzy_substring_empty_pattern() {
+        assert!(contains_fuzzy_substring("anything", "", 0));
+    }
+
+    #[test]
+    fn test_contains_fuzzy_substring_empty_text() {
+        assert!(!contains_fuzzy_substring("", "hello", 0));
+    }
+
+    #[test]
+    fn test_contains_fuzzy_substring_exact_match() {
+        assert!(contains_fuzzy_substring("hello", "hello", 0));
+    }
+
+    // ─── ngram_threshold edge cases ─────────────────────────────────────
+
+    #[test]
+    fn test_ngram_threshold_zero_trigrams() {
+        // With 0 trigrams and distance 0, threshold should be min 1
+        assert_eq!(ngram_threshold(0, 0), 1);
+    }
+
+    #[test]
+    fn test_ngram_threshold_high_distance() {
+        // With distance > num_trigrams / 3, threshold floors to 1
+        assert_eq!(ngram_threshold(3, 2), 1);
+    }
+
+    // ─── edit_distance edge cases ───────────────────────────────────────
+
+    #[test]
+    fn test_edit_distance_same_length() {
+        assert_eq!(edit_distance("abc", "axc"), 1);
+    }
+
+    #[test]
+    fn test_edit_distance_insert_delete() {
+        assert_eq!(edit_distance("abc", "abcd"), 1);
+        assert_eq!(edit_distance("abcd", "abc"), 1);
+    }
+
+    // ─── tokenize_raw edge cases ────────────────────────────────────────
+
+    #[test]
+    fn test_tokenize_raw_empty() {
+        assert_eq!(tokenize_raw(""), Vec::<(usize, usize)>::new());
+    }
+
+    #[test]
+    fn test_tokenize_raw_only_separators() {
+        assert_eq!(tokenize_raw("---...   "), Vec::<(usize, usize)>::new());
+    }
+
+    #[test]
+    fn test_tokenize_raw_single_word() {
+        assert_eq!(tokenize_raw("hello"), vec![(0, 5)]);
+    }
+
+    // ─── HighlightSink ─────────────────────────────────────────────────
+
+    #[test]
+    fn test_highlight_sink_insert_get() {
+        let sink = HighlightSink::new();
+        sink.insert(0, 42, vec![[5, 10], [20, 30]]);
+        let offsets = sink.get(0, 42).unwrap();
+        assert_eq!(offsets, vec![[5, 10], [20, 30]]);
+    }
+
+    #[test]
+    fn test_highlight_sink_get_missing() {
+        let sink = HighlightSink::new();
+        assert!(sink.get(0, 99).is_none());
+    }
+
+    #[test]
+    fn test_highlight_sink_next_segment() {
+        let sink = HighlightSink::new();
+        assert_eq!(sink.next_segment(), 0);
+        assert_eq!(sink.next_segment(), 1);
+        assert_eq!(sink.next_segment(), 2);
+    }
 }

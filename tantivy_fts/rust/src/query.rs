@@ -642,3 +642,274 @@ fn build_filter_clause(filter: &FilterClause, schema: &Schema) -> Result<Box<dyn
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ld_tantivy::schema::{INDEXED, STORED, STRING};
+    use serde_json::json;
+
+    // ─── regex_escape ───────────────────────────────────────────────────
+
+    #[test]
+    fn test_regex_escape_plain() {
+        assert_eq!(regex_escape("hello"), "hello");
+    }
+
+    #[test]
+    fn test_regex_escape_special_chars() {
+        assert_eq!(regex_escape("a.b*c+d"), r"a\.b\*c\+d");
+    }
+
+    #[test]
+    fn test_regex_escape_all_special() {
+        assert_eq!(
+            regex_escape(r"()[]{}|^$.*+?\"),
+            r"\(\)\[\]\{\}\|\^\$\.\*\+\?\\"
+        );
+    }
+
+    #[test]
+    fn test_regex_escape_empty() {
+        assert_eq!(regex_escape(""), "");
+    }
+
+    // ─── json_to_term ───────────────────────────────────────────────────
+
+    fn make_test_schema() -> Schema {
+        let mut builder = Schema::builder();
+        builder.add_u64_field("count", INDEXED | STORED);
+        builder.add_i64_field("offset", INDEXED | STORED);
+        builder.add_f64_field("score", INDEXED | STORED);
+        builder.add_text_field("name", STRING | STORED);
+        builder.build()
+    }
+
+    #[test]
+    fn test_json_to_term_u64() {
+        let schema = make_test_schema();
+        let field = schema.get_field("count").unwrap();
+        let ft = schema.get_field_entry(field).field_type();
+        let term = json_to_term(field, ft, &json!(42)).unwrap();
+        assert_eq!(term, Term::from_field_u64(field, 42));
+    }
+
+    #[test]
+    fn test_json_to_term_i64() {
+        let schema = make_test_schema();
+        let field = schema.get_field("offset").unwrap();
+        let ft = schema.get_field_entry(field).field_type();
+        let term = json_to_term(field, ft, &json!(-10)).unwrap();
+        assert_eq!(term, Term::from_field_i64(field, -10));
+    }
+
+    #[test]
+    fn test_json_to_term_f64() {
+        let schema = make_test_schema();
+        let field = schema.get_field("score").unwrap();
+        let ft = schema.get_field_entry(field).field_type();
+        let term = json_to_term(field, ft, &json!(3.14)).unwrap();
+        assert_eq!(term, Term::from_field_f64(field, 3.14));
+    }
+
+    #[test]
+    fn test_json_to_term_str() {
+        let schema = make_test_schema();
+        let field = schema.get_field("name").unwrap();
+        let ft = schema.get_field_entry(field).field_type();
+        let term = json_to_term(field, ft, &json!("hello")).unwrap();
+        assert_eq!(term, Term::from_field_text(field, "hello"));
+    }
+
+    #[test]
+    fn test_json_to_term_type_mismatch() {
+        let schema = make_test_schema();
+        let field = schema.get_field("count").unwrap();
+        let ft = schema.get_field_entry(field).field_type();
+        assert!(json_to_term(field, ft, &json!("not a number")).is_err());
+    }
+
+    #[test]
+    fn test_json_to_term_i64_from_positive() {
+        let schema = make_test_schema();
+        let field = schema.get_field("offset").unwrap();
+        let ft = schema.get_field_entry(field).field_type();
+        let term = json_to_term(field, ft, &json!(100)).unwrap();
+        assert_eq!(term, Term::from_field_i64(field, 100));
+    }
+
+    // ─── QueryConfig deserialization ─────────────────────────────────────
+
+    #[test]
+    fn test_query_config_contains() {
+        let json = r#"{"type":"contains","field":"body","value":"programming"}"#;
+        let config: QueryConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(config.query_type, "contains");
+        assert_eq!(config.field.as_deref(), Some("body"));
+        assert_eq!(config.value.as_deref(), Some("programming"));
+        assert_eq!(config.regex, None);
+        assert_eq!(config.distance, None);
+    }
+
+    #[test]
+    fn test_query_config_contains_regex() {
+        let json = r#"{"type":"contains","field":"body","value":"program[a-z]+","regex":true}"#;
+        let config: QueryConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(config.query_type, "contains");
+        assert_eq!(config.regex, Some(true));
+    }
+
+    #[test]
+    fn test_query_config_contains_hybrid() {
+        let json = r#"{"type":"contains","field":"body","value":"program[a-z]+","regex":true,"distance":1}"#;
+        let config: QueryConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(config.regex, Some(true));
+        assert_eq!(config.distance, Some(1));
+    }
+
+    #[test]
+    fn test_query_config_fuzzy() {
+        let json = r#"{"type":"fuzzy","field":"body","value":"programing","distance":2}"#;
+        let config: QueryConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(config.query_type, "fuzzy");
+        assert_eq!(config.distance, Some(2));
+    }
+
+    #[test]
+    fn test_query_config_phrase() {
+        let json =
+            r#"{"type":"phrase","field":"body","terms":["systems","programming"]}"#;
+        let config: QueryConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(config.query_type, "phrase");
+        assert_eq!(
+            config.terms.as_ref().unwrap(),
+            &["systems", "programming"]
+        );
+    }
+
+    #[test]
+    fn test_query_config_with_filters() {
+        let json = r#"{"type":"contains","field":"body","value":"rust","filters":[{"field":"count","op":"gte","value":5}]}"#;
+        let config: QueryConfig = serde_json::from_str(json).unwrap();
+        let filters = config.filters.as_ref().unwrap();
+        assert_eq!(filters.len(), 1);
+        assert_eq!(filters[0].field, "count");
+        assert_eq!(filters[0].op, "gte");
+    }
+
+    #[test]
+    fn test_query_config_boolean() {
+        let json = r#"{"type":"boolean","must":[{"type":"term","field":"body","value":"rust"}],"must_not":[{"type":"term","field":"body","value":"python"}]}"#;
+        let config: QueryConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(config.query_type, "boolean");
+        assert_eq!(config.must.as_ref().unwrap().len(), 1);
+        assert_eq!(config.must_not.as_ref().unwrap().len(), 1);
+        assert!(config.should.is_none());
+    }
+
+    // ─── build_filter_clause ────────────────────────────────────────────
+
+    #[test]
+    fn test_filter_clause_eq() {
+        let schema = make_test_schema();
+        let filter = FilterClause {
+            field: "count".into(),
+            op: "eq".into(),
+            value: json!(42),
+        };
+        assert!(build_filter_clause(&filter, &schema).is_ok());
+    }
+
+    #[test]
+    fn test_filter_clause_ne() {
+        let schema = make_test_schema();
+        let filter = FilterClause {
+            field: "count".into(),
+            op: "ne".into(),
+            value: json!(0),
+        };
+        assert!(build_filter_clause(&filter, &schema).is_ok());
+    }
+
+    #[test]
+    fn test_filter_clause_range_ops() {
+        let schema = make_test_schema();
+        for op in &["lt", "lte", "gt", "gte"] {
+            let filter = FilterClause {
+                field: "offset".into(),
+                op: op.to_string(),
+                value: json!(100),
+            };
+            assert!(
+                build_filter_clause(&filter, &schema).is_ok(),
+                "op {op} should work"
+            );
+        }
+    }
+
+    #[test]
+    fn test_filter_clause_in() {
+        let schema = make_test_schema();
+        let filter = FilterClause {
+            field: "count".into(),
+            op: "in".into(),
+            value: json!([1, 2, 3]),
+        };
+        assert!(build_filter_clause(&filter, &schema).is_ok());
+    }
+
+    #[test]
+    fn test_filter_clause_in_empty() {
+        let schema = make_test_schema();
+        let filter = FilterClause {
+            field: "count".into(),
+            op: "in".into(),
+            value: json!([]),
+        };
+        assert!(build_filter_clause(&filter, &schema).is_err());
+    }
+
+    #[test]
+    fn test_filter_clause_unknown_op() {
+        let schema = make_test_schema();
+        let filter = FilterClause {
+            field: "count".into(),
+            op: "like".into(),
+            value: json!("foo"),
+        };
+        assert!(build_filter_clause(&filter, &schema).is_err());
+    }
+
+    #[test]
+    fn test_filter_clause_unknown_field() {
+        let schema = make_test_schema();
+        let filter = FilterClause {
+            field: "nonexistent".into(),
+            op: "eq".into(),
+            value: json!(1),
+        };
+        assert!(build_filter_clause(&filter, &schema).is_err());
+    }
+
+    #[test]
+    fn test_filter_clause_f64() {
+        let schema = make_test_schema();
+        let filter = FilterClause {
+            field: "score".into(),
+            op: "gte".into(),
+            value: json!(0.5),
+        };
+        assert!(build_filter_clause(&filter, &schema).is_ok());
+    }
+
+    #[test]
+    fn test_filter_clause_string_eq() {
+        let schema = make_test_schema();
+        let filter = FilterClause {
+            field: "name".into(),
+            op: "eq".into(),
+            value: json!("hello"),
+        };
+        assert!(build_filter_clause(&filter, &schema).is_ok());
+    }
+}
+

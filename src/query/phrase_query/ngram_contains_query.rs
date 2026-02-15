@@ -846,4 +846,210 @@ mod tests {
         let tf = verify_regex("anything", &params, &None, 0, 0);
         assert!(tf > 0); // .* matches everything
     }
+
+    #[test]
+    fn test_regex_word_boundary() {
+        let params = make_regex_params(r"\brust\b", vec!["rust"], 0);
+        let tf = verify_regex("Rust is great but rusty is not", &params, &None, 0, 0);
+        assert_eq!(tf, 1); // "Rust" matches, "rusty" does not
+    }
+
+    #[test]
+    fn test_regex_unicode() {
+        let params = make_regex_params(r"café", vec!["café"], 0);
+        let tf = verify_regex("I love café au lait", &params, &None, 0, 0);
+        assert_eq!(tf, 1);
+    }
+
+    #[test]
+    fn test_regex_hybrid_fuzzy_only_match() {
+        // Regex "xyz[0-9]+" won't match any text, but fuzzy on literal "database"
+        // with distance=1 should match "databse" (typo).
+        let params = make_regex_params(r"databse", vec!["databse"], 1);
+        let tf = verify_regex("Graph databases store data", &params, &None, 0, 0);
+        // "databse" is distance 1 from "database" (substring of "databases")
+        assert!(tf > 0, "hybrid should match via fuzzy on literal");
+    }
+
+    #[test]
+    fn test_regex_multiple_highlights() {
+        let sink = Arc::new(HighlightSink::new());
+        let params = make_regex_params(r"[a-z]+ing", vec!["ing"], 0);
+        let text = "programming and testing are fun";
+        let tf = verify_regex(text, &params, &Some(sink.clone()), 0, 99);
+        assert_eq!(tf, 2); // "programming" and "testing"
+        let offsets = sink.get(0, 99).expect("should have highlights");
+        assert_eq!(offsets.len(), 2);
+    }
+
+    // ─── count_single_token_fuzzy ──────────────────────────────────────
+
+    fn make_fuzzy_params(
+        tokens: Vec<&str>,
+        separators: Vec<&str>,
+        prefix: &str,
+        suffix: &str,
+        distance: u8,
+        budget: u32,
+    ) -> FuzzyParams {
+        FuzzyParams {
+            tokens: tokens.into_iter().map(|s| s.to_string()).collect(),
+            separators: separators.into_iter().map(|s| s.to_string()).collect(),
+            prefix: prefix.to_string(),
+            suffix: suffix.to_string(),
+            fuzzy_distance: distance,
+            distance_budget: budget,
+            strict_separators: true,
+        }
+    }
+
+    #[test]
+    fn test_fuzzy_single_exact() {
+        let text = "Rust is a programming language";
+        let tokens = tokenize_raw(text);
+        let params = make_fuzzy_params(vec!["programming"], vec![], "", "", 1, 1);
+        assert_eq!(
+            count_single_token_fuzzy(text, &tokens, &params, &None, 0, 0),
+            1
+        );
+    }
+
+    #[test]
+    fn test_fuzzy_single_typo() {
+        let text = "Rust is a programming language";
+        let tokens = tokenize_raw(text);
+        let params = make_fuzzy_params(vec!["programing"], vec![], "", "", 1, 1);
+        assert_eq!(
+            count_single_token_fuzzy(text, &tokens, &params, &None, 0, 0),
+            1
+        );
+    }
+
+    #[test]
+    fn test_fuzzy_single_no_match() {
+        let text = "Rust is a programming language";
+        let tokens = tokenize_raw(text);
+        let params = make_fuzzy_params(vec!["python"], vec![], "", "", 1, 1);
+        assert_eq!(
+            count_single_token_fuzzy(text, &tokens, &params, &None, 0, 0),
+            0
+        );
+    }
+
+    #[test]
+    fn test_fuzzy_single_multiple_matches() {
+        let text = "programming in Rust: a programmer guide";
+        let tokens = tokenize_raw(text);
+        // "program" is a substring of both "programming" and "programmer"
+        let params = make_fuzzy_params(vec!["program"], vec![], "", "", 1, 1);
+        assert_eq!(
+            count_single_token_fuzzy(text, &tokens, &params, &None, 0, 0),
+            2
+        );
+    }
+
+    #[test]
+    fn test_fuzzy_single_distance_zero_no_match() {
+        let text = "Rust is a programming language";
+        let tokens = tokenize_raw(text);
+        // distance=0: "programing" is not exact, not a substring
+        let params = make_fuzzy_params(vec!["programing"], vec![], "", "", 0, 0);
+        assert_eq!(
+            count_single_token_fuzzy(text, &tokens, &params, &None, 0, 0),
+            0
+        );
+    }
+
+    #[test]
+    fn test_fuzzy_single_highlights() {
+        let sink = Arc::new(HighlightSink::new());
+        let text = "Rust programming is fun";
+        let tokens = tokenize_raw(text);
+        let params = make_fuzzy_params(vec!["programming"], vec![], "", "", 1, 1);
+        let tf =
+            count_single_token_fuzzy(text, &tokens, &params, &Some(sink.clone()), 0, 42);
+        assert_eq!(tf, 1);
+        let offsets = sink.get(0, 42).expect("should have highlights");
+        assert_eq!(offsets.len(), 1);
+        assert_eq!(offsets[0], [5, 16]); // "programming" at bytes 5..16
+    }
+
+    // ─── count_multi_token_fuzzy ──────────────────────────────────────
+
+    #[test]
+    fn test_fuzzy_multi_exact() {
+        let text = "Rust is a systems programming language";
+        let tokens = tokenize_raw(text);
+        let params =
+            make_fuzzy_params(vec!["systems", "programming"], vec![" "], "", "", 1, 1);
+        assert_eq!(
+            count_multi_token_fuzzy(text, &tokens, &params, &None, 0, 0),
+            1
+        );
+    }
+
+    #[test]
+    fn test_fuzzy_multi_typo() {
+        let text = "Rust is a systems programming language";
+        let tokens = tokenize_raw(text);
+        let params =
+            make_fuzzy_params(vec!["sistems", "programing"], vec![" "], "", "", 1, 2);
+        assert_eq!(
+            count_multi_token_fuzzy(text, &tokens, &params, &None, 0, 0),
+            1
+        );
+    }
+
+    #[test]
+    fn test_fuzzy_multi_budget_exceeded() {
+        let text = "Rust is a systems programming language";
+        let tokens = tokenize_raw(text);
+        // 2 edits total but budget=1
+        let params =
+            make_fuzzy_params(vec!["sistems", "programing"], vec![" "], "", "", 1, 1);
+        assert_eq!(
+            count_multi_token_fuzzy(text, &tokens, &params, &None, 0, 0),
+            0
+        );
+    }
+
+    #[test]
+    fn test_fuzzy_multi_no_match() {
+        let text = "Rust is a systems programming language";
+        let tokens = tokenize_raw(text);
+        let params =
+            make_fuzzy_params(vec!["machine", "learning"], vec![" "], "", "", 1, 1);
+        assert_eq!(
+            count_multi_token_fuzzy(text, &tokens, &params, &None, 0, 0),
+            0
+        );
+    }
+
+    #[test]
+    fn test_fuzzy_multi_not_enough_tokens() {
+        let text = "Rust";
+        let tokens = tokenize_raw(text);
+        let params =
+            make_fuzzy_params(vec!["systems", "programming"], vec![" "], "", "", 1, 1);
+        assert_eq!(
+            count_multi_token_fuzzy(text, &tokens, &params, &None, 0, 0),
+            0
+        );
+    }
+
+    #[test]
+    fn test_fuzzy_multi_highlights() {
+        let sink = Arc::new(HighlightSink::new());
+        let text = "Rust is a systems programming language";
+        let tokens = tokenize_raw(text);
+        let params =
+            make_fuzzy_params(vec!["systems", "programming"], vec![" "], "", "", 1, 1);
+        let tf =
+            count_multi_token_fuzzy(text, &tokens, &params, &Some(sink.clone()), 0, 42);
+        assert_eq!(tf, 1);
+        let offsets = sink.get(0, 42).expect("should have highlights");
+        assert_eq!(offsets.len(), 2);
+        assert_eq!(offsets[0], [10, 17]); // "systems" at bytes 10..17
+        assert_eq!(offsets[1], [18, 29]); // "programming" at bytes 18..29
+    }
 }
