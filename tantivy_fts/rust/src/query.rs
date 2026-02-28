@@ -11,7 +11,7 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
 use ld_tantivy::query::{
-    AutomatonPhraseQuery, BooleanQuery, FuzzyParams, FuzzyTermQuery, HighlightSink,
+    AllQuery, AutomatonPhraseQuery, BooleanQuery, FuzzyParams, FuzzyTermQuery, HighlightSink,
     NgramContainsQuery, Occur, PhraseQuery, Query, QueryParser, RangeQuery, RegexParams,
     RegexQuery, TermQuery, VerificationMode,
 };
@@ -43,12 +43,16 @@ pub struct FieldDef {
 
 #[derive(Deserialize)]
 pub struct FilterClause {
-    pub field: String,
-    pub op: String, // "eq", "ne", "lt", "lte", "gt", "gte", "in"
-    pub value: serde_json::Value,
+    pub field: Option<String>,
+    pub op: String, // "eq", "ne", "lt", "lte", "gt", "gte", "in", "between", "not_in", "starts_with", "contains", "must", "should", "must_not"
+    pub value: Option<serde_json::Value>,
+    /// Fuzzy distance for "contains" op (default 1).
+    pub distance: Option<u8>,
+    /// Sub-clauses for composite ops (must/should/must_not).
+    pub clauses: Option<Vec<FilterClause>>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Default)]
 pub struct QueryConfig {
     #[serde(rename = "type")]
     pub query_type: String,
@@ -195,7 +199,7 @@ pub fn build_query(
             let mut clauses: Vec<(Occur, Box<dyn Query>)> = Vec::new();
             clauses.push((Occur::Must, text_query));
             for filter in filters {
-                clauses.push((Occur::Must, build_filter_clause(filter, schema)?));
+                clauses.push((Occur::Must, build_filter_clause(filter, schema, index, raw_pairs, ngram_pairs)?));
             }
             return Ok(Box::new(BooleanQuery::new(clauses)));
         }
@@ -324,7 +328,9 @@ fn build_contains_fuzzy(
     let fuzzy_distance = config.distance.unwrap_or(1);
     let strict_separators = config.strict_separators.unwrap_or(true);
 
+
     let tokens = tokenize_with_offsets(index, field, schema, value);
+
 
     if tokens.is_empty() {
         let escaped = regex_escape(&value.to_lowercase());
@@ -345,7 +351,8 @@ fn build_contains_fuzzy(
     let token_texts: Vec<String> = tokens.iter().map(|t| t.text.clone()).collect();
     let distance_budget = fuzzy_distance as u32;
 
-    if let Some(ngram_field) = resolve_ngram_field(config, schema, ngram_pairs) {
+    let ngram_resolved = resolve_ngram_field(config, schema, ngram_pairs);
+    if let Some(ngram_field) = ngram_resolved {
         let verification = VerificationMode::Fuzzy(FuzzyParams {
             tokens: token_texts.clone(),
             separators,
@@ -590,42 +597,84 @@ fn json_to_term(field: Field, field_type: &FieldType, value: &serde_json::Value)
     }
 }
 
-fn build_filter_clause(filter: &FilterClause, schema: &Schema) -> Result<Box<dyn Query>, String> {
+fn build_filter_clause(
+    filter: &FilterClause,
+    schema: &Schema,
+    index: &Index,
+    raw_pairs: &[(String, String)],
+    ngram_pairs: &[(String, String)],
+) -> Result<Box<dyn Query>, String> {
+    // Composite ops (must/should/must_not) — no field required.
+    match filter.op.as_str() {
+        "must" | "should" | "must_not" => {
+            let sub_clauses = filter.clauses.as_ref()
+                .ok_or_else(|| format!("'{}' filter requires 'clauses'", filter.op))?;
+            let occur = match filter.op.as_str() {
+                "must" => Occur::Must,
+                "should" => Occur::Should,
+                "must_not" => Occur::MustNot,
+                _ => unreachable!(),
+            };
+            let clauses: Vec<(Occur, Box<dyn Query>)> = sub_clauses
+                .iter()
+                .map(|c| Ok((occur, build_filter_clause(c, schema, index, raw_pairs, ngram_pairs)?)))
+                .collect::<Result<Vec<_>, String>>()?;
+            if clauses.is_empty() {
+                return Err(format!("'{}' filter requires at least one clause", filter.op));
+            }
+            // MustNot-only BooleanQuery matches nothing — add AllQuery as positive clause.
+            if filter.op == "must_not" {
+                let mut full_clauses = vec![(Occur::Must, Box::new(AllQuery) as Box<dyn Query>)];
+                full_clauses.extend(clauses);
+                return Ok(Box::new(BooleanQuery::new(full_clauses)));
+            }
+            return Ok(Box::new(BooleanQuery::new(clauses)));
+        }
+        _ => {}
+    }
+
+    // Scalar ops — field required.
+    let field_name = filter.field.as_deref()
+        .ok_or_else(|| format!("'{}' filter requires 'field'", filter.op))?;
     let field = schema
-        .get_field(&filter.field)
-        .map_err(|_| format!("unknown filter field: {}", filter.field))?;
+        .get_field(field_name)
+        .map_err(|_| format!("unknown filter field: {field_name}"))?;
     let field_type = schema.get_field_entry(field).field_type().clone();
+
+    let value = || filter.value.as_ref()
+        .ok_or_else(|| format!("'{}' filter requires 'value'", filter.op));
 
     match filter.op.as_str() {
         "eq" => {
-            let term = json_to_term(field, &field_type, &filter.value)?;
+            let term = json_to_term(field, &field_type, value()?)?;
             Ok(Box::new(TermQuery::new(term, IndexRecordOption::Basic)))
         }
         "ne" => {
-            let term = json_to_term(field, &field_type, &filter.value)?;
+            let term = json_to_term(field, &field_type, value()?)?;
             let eq_query = TermQuery::new(term, IndexRecordOption::Basic);
             Ok(Box::new(BooleanQuery::new(vec![
+                (Occur::Must, Box::new(AllQuery) as Box<dyn Query>),
                 (Occur::MustNot, Box::new(eq_query) as Box<dyn Query>),
             ])))
         }
         "lt" => {
-            let term = json_to_term(field, &field_type, &filter.value)?;
+            let term = json_to_term(field, &field_type, value()?)?;
             Ok(Box::new(RangeQuery::new(Bound::Unbounded, Bound::Excluded(term))))
         }
         "lte" => {
-            let term = json_to_term(field, &field_type, &filter.value)?;
+            let term = json_to_term(field, &field_type, value()?)?;
             Ok(Box::new(RangeQuery::new(Bound::Unbounded, Bound::Included(term))))
         }
         "gt" => {
-            let term = json_to_term(field, &field_type, &filter.value)?;
+            let term = json_to_term(field, &field_type, value()?)?;
             Ok(Box::new(RangeQuery::new(Bound::Excluded(term), Bound::Unbounded)))
         }
         "gte" => {
-            let term = json_to_term(field, &field_type, &filter.value)?;
+            let term = json_to_term(field, &field_type, value()?)?;
             Ok(Box::new(RangeQuery::new(Bound::Included(term), Bound::Unbounded)))
         }
         "in" => {
-            let values = filter.value.as_array().ok_or("'in' operator requires an array value")?;
+            let values = value()?.as_array().ok_or("'in' operator requires an array value")?;
             let clauses: Vec<(Occur, Box<dyn Query>)> = values
                 .iter()
                 .map(|v| {
@@ -637,6 +686,70 @@ fn build_filter_clause(filter: &FilterClause, schema: &Schema) -> Result<Box<dyn
                 return Err("'in' filter requires at least one value".to_string());
             }
             Ok(Box::new(BooleanQuery::new(clauses)))
+        }
+        "between" => {
+            let arr = value()?.as_array()
+                .ok_or("'between' filter requires a [lo, hi] array value")?;
+            if arr.len() != 2 {
+                return Err("'between' filter requires exactly [lo, hi]".to_string());
+            }
+            let lo = json_to_term(field, &field_type, &arr[0])?;
+            let hi = json_to_term(field, &field_type, &arr[1])?;
+            let range_lo = RangeQuery::new(Bound::Included(lo), Bound::Unbounded);
+            let range_hi = RangeQuery::new(Bound::Unbounded, Bound::Included(hi));
+            Ok(Box::new(BooleanQuery::new(vec![
+                (Occur::Must, Box::new(range_lo) as Box<dyn Query>),
+                (Occur::Must, Box::new(range_hi) as Box<dyn Query>),
+            ])))
+        }
+        "not_in" => {
+            let values = value()?.as_array().ok_or("'not_in' operator requires an array value")?;
+            let inner_clauses: Vec<(Occur, Box<dyn Query>)> = values
+                .iter()
+                .map(|v| {
+                    let term = json_to_term(field, &field_type, v)?;
+                    Ok((Occur::Should, Box::new(TermQuery::new(term, IndexRecordOption::Basic)) as Box<dyn Query>))
+                })
+                .collect::<Result<Vec<_>, String>>()?;
+            if inner_clauses.is_empty() {
+                return Err("'not_in' filter requires at least one value".to_string());
+            }
+            let in_query = BooleanQuery::new(inner_clauses);
+            Ok(Box::new(BooleanQuery::new(vec![
+                (Occur::Must, Box::new(AllQuery) as Box<dyn Query>),
+                (Occur::MustNot, Box::new(in_query) as Box<dyn Query>),
+            ])))
+        }
+        "starts_with" => {
+            let prefix = value()?.as_str()
+                .ok_or("'starts_with' filter requires a string value")?;
+            let lower = prefix.to_lowercase();
+            // Exact match of the prefix itself.
+            let exact = TermQuery::new(
+                Term::from_field_text(field, &lower),
+                IndexRecordOption::Basic,
+            );
+            // Prefix + at least one more char (.+ avoids the empty-match limitation of .*).
+            let escaped = regex_escape(&lower);
+            let regex = RegexQuery::from_pattern(&format!("{escaped}.+"), field)
+                .map_err(|e| format!("invalid starts_with pattern: {e}"))?;
+            Ok(Box::new(BooleanQuery::new(vec![
+                (Occur::Should, Box::new(exact) as Box<dyn Query>),
+                (Occur::Should, Box::new(regex) as Box<dyn Query>),
+            ])))
+        }
+        "contains" => {
+            let substr = value()?.as_str()
+                .ok_or("'contains' filter requires a string value")?;
+            let distance = filter.distance.unwrap_or(1);
+            let config = QueryConfig {
+                query_type: "contains".into(),
+                field: Some(field_name.to_string()),
+                value: Some(substr.to_string()),
+                distance: Some(distance),
+                ..Default::default()
+            };
+            build_contains_query(&config, schema, index, raw_pairs, ngram_pairs, None)
         }
         other => Err(format!("unknown filter operator: {other}")),
     }
@@ -792,7 +905,7 @@ mod tests {
         let config: QueryConfig = serde_json::from_str(json).unwrap();
         let filters = config.filters.as_ref().unwrap();
         assert_eq!(filters.len(), 1);
-        assert_eq!(filters[0].field, "count");
+        assert_eq!(filters[0].field.as_deref(), Some("count"));
         assert_eq!(filters[0].op, "gte");
     }
 
@@ -808,108 +921,198 @@ mod tests {
 
     // ─── build_filter_clause ────────────────────────────────────────────
 
+    fn make_filter(field: &str, op: &str, value: serde_json::Value) -> FilterClause {
+        FilterClause {
+            field: Some(field.into()),
+            op: op.into(),
+            value: Some(value),
+            distance: None,
+            clauses: None,
+        }
+    }
+
+    fn make_filter_index() -> (Schema, Index) {
+        let schema = make_test_schema();
+        let index = Index::create_in_ram(schema.clone());
+        (schema, index)
+    }
+
+    fn assert_filter_ok(filter: &FilterClause) {
+        let (schema, index) = make_filter_index();
+        assert!(build_filter_clause(filter, &schema, &index, &[], &[]).is_ok());
+    }
+
+    fn assert_filter_err(filter: &FilterClause) {
+        let (schema, index) = make_filter_index();
+        assert!(build_filter_clause(filter, &schema, &index, &[], &[]).is_err());
+    }
+
     #[test]
     fn test_filter_clause_eq() {
-        let schema = make_test_schema();
-        let filter = FilterClause {
-            field: "count".into(),
-            op: "eq".into(),
-            value: json!(42),
-        };
-        assert!(build_filter_clause(&filter, &schema).is_ok());
+        assert_filter_ok(&make_filter("count", "eq", json!(42)));
     }
 
     #[test]
     fn test_filter_clause_ne() {
-        let schema = make_test_schema();
-        let filter = FilterClause {
-            field: "count".into(),
-            op: "ne".into(),
-            value: json!(0),
-        };
-        assert!(build_filter_clause(&filter, &schema).is_ok());
+        assert_filter_ok(&make_filter("count", "ne", json!(0)));
     }
 
     #[test]
     fn test_filter_clause_range_ops() {
-        let schema = make_test_schema();
         for op in &["lt", "lte", "gt", "gte"] {
-            let filter = FilterClause {
-                field: "offset".into(),
-                op: op.to_string(),
-                value: json!(100),
-            };
-            assert!(
-                build_filter_clause(&filter, &schema).is_ok(),
-                "op {op} should work"
-            );
+            assert_filter_ok(&make_filter("offset", op, json!(100)));
         }
     }
 
     #[test]
     fn test_filter_clause_in() {
-        let schema = make_test_schema();
-        let filter = FilterClause {
-            field: "count".into(),
-            op: "in".into(),
-            value: json!([1, 2, 3]),
-        };
-        assert!(build_filter_clause(&filter, &schema).is_ok());
+        assert_filter_ok(&make_filter("count", "in", json!([1, 2, 3])));
     }
 
     #[test]
     fn test_filter_clause_in_empty() {
-        let schema = make_test_schema();
-        let filter = FilterClause {
-            field: "count".into(),
-            op: "in".into(),
-            value: json!([]),
-        };
-        assert!(build_filter_clause(&filter, &schema).is_err());
+        assert_filter_err(&make_filter("count", "in", json!([])));
     }
 
     #[test]
     fn test_filter_clause_unknown_op() {
-        let schema = make_test_schema();
-        let filter = FilterClause {
-            field: "count".into(),
-            op: "like".into(),
-            value: json!("foo"),
-        };
-        assert!(build_filter_clause(&filter, &schema).is_err());
+        assert_filter_err(&make_filter("count", "like", json!("foo")));
     }
 
     #[test]
     fn test_filter_clause_unknown_field() {
-        let schema = make_test_schema();
-        let filter = FilterClause {
-            field: "nonexistent".into(),
-            op: "eq".into(),
-            value: json!(1),
-        };
-        assert!(build_filter_clause(&filter, &schema).is_err());
+        assert_filter_err(&make_filter("nonexistent", "eq", json!(1)));
     }
 
     #[test]
     fn test_filter_clause_f64() {
-        let schema = make_test_schema();
-        let filter = FilterClause {
-            field: "score".into(),
-            op: "gte".into(),
-            value: json!(0.5),
-        };
-        assert!(build_filter_clause(&filter, &schema).is_ok());
+        assert_filter_ok(&make_filter("score", "gte", json!(0.5)));
     }
 
     #[test]
     fn test_filter_clause_string_eq() {
-        let schema = make_test_schema();
+        assert_filter_ok(&make_filter("name", "eq", json!("hello")));
+    }
+
+    // ─── New ops ──────────────────────────────────────────────────────
+
+    #[test]
+    fn test_filter_clause_between() {
+        assert_filter_ok(&make_filter("offset", "between", json!([-10, 100])));
+    }
+
+    #[test]
+    fn test_filter_clause_between_bad_arity() {
+        assert_filter_err(&make_filter("offset", "between", json!([1])));
+        assert_filter_err(&make_filter("offset", "between", json!([1, 2, 3])));
+    }
+
+    #[test]
+    fn test_filter_clause_not_in() {
+        assert_filter_ok(&make_filter("count", "not_in", json!([1, 2, 3])));
+    }
+
+    #[test]
+    fn test_filter_clause_not_in_empty() {
+        assert_filter_err(&make_filter("count", "not_in", json!([])));
+    }
+
+    #[test]
+    fn test_filter_clause_starts_with() {
+        let (schema, index) = make_filter_index();
+        let filter = make_filter("name", "starts_with", json!("hel"));
+        let result = build_filter_clause(&filter, &schema, &index, &[], &[]);
+        assert!(result.is_ok(), "starts_with failed: {:?}", result.err());
+    }
+
+    #[test]
+    fn test_filter_clause_contains() {
+        // Contains dispatches to build_contains_query — needs an index with the field.
+        // With no ngram/raw pairs, falls back to AutomatonPhraseQuery or RegexQuery.
+        assert_filter_ok(&make_filter("name", "contains", json!("ell")));
+    }
+
+    #[test]
+    fn test_filter_clause_contains_with_fuzzy() {
+        let (schema, index) = make_filter_index();
         let filter = FilterClause {
-            field: "name".into(),
-            op: "eq".into(),
-            value: json!("hello"),
+            field: Some("name".into()),
+            op: "contains".into(),
+            value: Some(json!("helo")),
+            distance: Some(2),
+            clauses: None,
         };
-        assert!(build_filter_clause(&filter, &schema).is_ok());
+        assert!(build_filter_clause(&filter, &schema, &index, &[], &[]).is_ok());
+    }
+
+    // ─── Composite ops ────────────────────────────────────────────────
+
+    #[test]
+    fn test_filter_clause_must_composite() {
+        let filter = FilterClause {
+            field: None,
+            op: "must".into(),
+            value: None,
+            distance: None,
+            clauses: Some(vec![
+                make_filter("count", "gte", json!(10)),
+                make_filter("score", "lte", json!(0.9)),
+            ]),
+        };
+        assert_filter_ok(&filter);
+    }
+
+    #[test]
+    fn test_filter_clause_should_composite() {
+        let filter = FilterClause {
+            field: None,
+            op: "should".into(),
+            value: None,
+            distance: None,
+            clauses: Some(vec![
+                make_filter("name", "eq", json!("alice")),
+                make_filter("name", "eq", json!("bob")),
+            ]),
+        };
+        assert_filter_ok(&filter);
+    }
+
+    #[test]
+    fn test_filter_clause_must_not_composite() {
+        let filter = FilterClause {
+            field: None,
+            op: "must_not".into(),
+            value: None,
+            distance: None,
+            clauses: Some(vec![
+                make_filter("count", "eq", json!(0)),
+            ]),
+        };
+        assert_filter_ok(&filter);
+    }
+
+    #[test]
+    fn test_filter_clause_composite_empty_clauses() {
+        let filter = FilterClause {
+            field: None,
+            op: "must".into(),
+            value: None,
+            distance: None,
+            clauses: Some(vec![]),
+        };
+        assert_filter_err(&filter);
+    }
+
+    #[test]
+    fn test_filter_clause_composite_missing_clauses() {
+        let filter = FilterClause {
+            field: None,
+            op: "must".into(),
+            value: None,
+            distance: None,
+            clauses: None,
+        };
+        assert_filter_err(&filter);
     }
 }
 

@@ -198,7 +198,7 @@ impl SchemaBuilder {
     pub fn add_field(&mut self, field_entry: FieldEntry) -> Field {
         let field = Field::from_field_id(self.fields.len() as u32);
         let field_name = field_entry.name().to_string();
-        if let Some(_previous_value) = self.fields_map.insert(field_name, field) {
+        if let Some(_previous_value) = self.fields_map.insert(field_name.clone(), field) {
             panic!("Field already exists in schema {}", field_entry.name());
         };
         self.fields.push(field_entry);

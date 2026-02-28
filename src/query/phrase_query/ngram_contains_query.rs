@@ -345,8 +345,12 @@ fn count_single_token_fuzzy(
         let doc_token = stored_text[start..end].to_lowercase();
 
         let distance = match token_match_distance(&doc_token, query_token, params.fuzzy_distance) {
-            Some(d) => d,
-            None => continue,
+            Some(d) => {
+                d
+            },
+            None => {
+                continue;
+            },
         };
 
         let mut total_distance = distance;
@@ -658,7 +662,9 @@ impl NgramContainsScorer {
         };
         let stored_text = match doc.get_first(self.text_field).and_then(|v| v.as_str()) {
             Some(s) => s,
-            None => return false,
+            None => {
+                return false;
+            }
         };
 
         let tf = match &self.verification {
@@ -701,6 +707,7 @@ impl NgramContainsScorer {
 
 impl DocSet for NgramContainsScorer {
     fn advance(&mut self) -> DocId {
+        let before_doc = self.doc();
         loop {
             self.cursor += 1;
             let doc = self.doc();
@@ -711,13 +718,15 @@ impl DocSet for NgramContainsScorer {
     }
 
     fn seek(&mut self, target: DocId) -> DocId {
+        let before_doc = self.doc();
         while self.cursor < self.candidates.len() && self.candidates[self.cursor] < target {
             self.cursor += 1;
         }
         if self.doc() == TERMINATED || self.verify() {
             return self.doc();
         }
-        self.advance()
+        let result = self.advance();
+        result
     }
 
     fn doc(&self) -> DocId {

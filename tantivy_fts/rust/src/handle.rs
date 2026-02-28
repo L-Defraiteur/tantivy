@@ -128,12 +128,19 @@ impl TantivyHandle {
                 .iter()
                 .filter(|f| f.field_type == "text")
                 .collect();
+            let string_fields: Vec<_> = config
+                .fields
+                .iter()
+                .filter(|f| f.field_type == "string")
+                .collect();
             let raw: Vec<_> = text_fields
                 .iter()
                 .map(|f| (f.name.clone(), format!("{}{RAW_SUFFIX}", f.name)))
                 .collect();
+            // Ngram pairs: text fields + string fields (both have ._ngram counterparts).
             let ngram: Vec<_> = text_fields
                 .iter()
+                .chain(string_fields.iter())
                 .map(|f| (f.name.clone(), format!("{}{NGRAM_SUFFIX}", f.name)))
                 .collect();
             (raw, ngram)
@@ -280,6 +287,16 @@ fn build_schema(
                 };
                 let field = builder.add_text_field(&field_def.name, opts);
                 field_map.push((field_def.name.clone(), field));
+
+                // Ngram counterpart for substring matching (NgramContainsQuery).
+                let ngram_indexing = TextFieldIndexing::default()
+                    .set_tokenizer(NGRAM_TOKENIZER)
+                    .set_index_option(IndexRecordOption::Basic);
+                let ngram_opts = TextOptions::default().set_indexing_options(ngram_indexing);
+                let ngram_name = format!("{}{NGRAM_SUFFIX}", field_def.name);
+                let ngram_field = builder.add_text_field(&ngram_name, ngram_opts);
+                field_map.push((ngram_name.clone(), ngram_field));
+                ngram_field_pairs.push((field_def.name.clone(), ngram_name));
             }
             other => return Err(format!("unknown field type: {other}")),
         }
@@ -321,5 +338,117 @@ fn configure_tokenizers(index: &Index, config: &SchemaConfig) {
             .filter(Stemmer::new(lang))
             .build();
         index.tokenizers().register(STEMMED_TOKENIZER, tokenizer);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(serde::Serialize)]
+    struct SchemaField {
+        name: String,
+        #[serde(rename = "type")]
+        field_type: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        stored: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        indexed: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        fast: Option<bool>,
+    }
+
+    #[derive(serde::Serialize)]
+    struct TestSchemaConfig {
+        fields: Vec<SchemaField>,
+    }
+
+    /// Integration test: STRING filter field + contains filter via build_query.
+    #[test]
+    fn test_string_filter_field_contains() {
+        let tmp = std::env::temp_dir().join("tantivy_test_string_filter_contains");
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(&tmp).unwrap();
+        let path = tmp.to_str().unwrap();
+
+        // Schema: text body + string filter field "tag"
+        let config_json = serde_json::json!({
+            "fields": [
+                {"name": "body", "type": "text", "stored": true},
+                {"name": "tag", "type": "string", "stored": true, "indexed": true, "fast": true}
+            ]
+        });
+        let config_str = config_json.to_string();
+        let config: SchemaConfig = serde_json::from_str(&config_str).unwrap();
+
+        let handle = TantivyHandle::create(path, &config).unwrap();
+
+        // Verify ngram pairs include "tag"
+        assert!(
+            handle.ngram_field_pairs.iter().any(|(user, _)| user == "tag"),
+            "ngram_field_pairs should contain tag: {:?}", handle.ngram_field_pairs
+        );
+
+        // Add documents
+        let body_field = handle.field("body").unwrap();
+        let tag_field = handle.field("tag").unwrap();
+        let nid_field = handle.field(NODE_ID_FIELD).unwrap();
+
+        {
+            let mut writer = handle.writer.lock().unwrap();
+            for (nid, body, tag) in [
+                (0u64, "Rust is a systems programming language", "programming"),
+                (1, "Python is a programming language", "programming"),
+                (2, "A guide to cooking Italian food", "cooking"),
+                (3, "C++ is a general-purpose programming language", "systems"),
+            ] {
+                let mut doc = ld_tantivy::TantivyDocument::new();
+                doc.add_u64(nid_field, nid);
+                doc.add_text(body_field, body);
+                doc.add_text(tag_field, tag);
+                // Auto-duplicate to ngram fields
+                for (user, ngram_name) in &handle.ngram_field_pairs {
+                    if user == "body" {
+                        if let Some(f) = handle.field(ngram_name) { doc.add_text(f, body); }
+                    }
+                    if user == "tag" {
+                        if let Some(f) = handle.field(ngram_name) { doc.add_text(f, tag); }
+                    }
+                }
+                // Also raw field for body
+                for (user, raw_name) in &handle.raw_field_pairs {
+                    if user == "body" {
+                        if let Some(f) = handle.field(raw_name) { doc.add_text(f, body); }
+                    }
+                }
+                writer.add_document(doc).unwrap();
+            }
+            writer.commit().unwrap();
+        }
+        handle.reader.reload().unwrap();
+
+        // Search: body contains "programming" + filter tag contains "ystem"
+        let query_json = r#"{
+            "type": "contains",
+            "field": "body",
+            "value": "programming",
+            "filters": [{"field": "tag", "op": "contains", "value": "ystem"}]
+        }"#;
+        let query_config: crate::query::QueryConfig = serde_json::from_str(query_json).unwrap();
+        let query = crate::query::build_query(
+            &query_config,
+            &handle.schema,
+            &handle.index,
+            &handle.raw_field_pairs,
+            &handle.ngram_field_pairs,
+            None,
+        ).unwrap();
+
+        let searcher = handle.reader.searcher();
+        let collector = ld_tantivy::collector::TopDocs::with_limit(10).order_by_score();
+        let results = searcher.search(&*query, &collector).unwrap();
+
+        println!("Results for contains 'ystem' filter: {:?}", results);
+        assert_eq!(results.len(), 1, "Should find 1 doc (tag=systems, body has programming)");
     }
 }
