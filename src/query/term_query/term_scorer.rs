@@ -14,6 +14,7 @@ pub struct TermScorer {
     fieldnorm_reader: FieldNormReader,
     similarity_weight: Bm25Weight,
     highlight_sink: Option<Arc<HighlightSink>>,
+    highlight_field_name: String,
     segment_ord: u32,
 }
 
@@ -28,6 +29,7 @@ impl TermScorer {
             fieldnorm_reader,
             similarity_weight,
             highlight_sink: None,
+            highlight_field_name: String::new(),
             segment_ord: 0,
         }
     }
@@ -35,9 +37,11 @@ impl TermScorer {
     pub fn with_highlight_sink(
         mut self,
         sink: Arc<HighlightSink>,
+        field_name: String,
         segment_ord: u32,
     ) -> Self {
         self.highlight_sink = Some(sink);
+        self.highlight_field_name = field_name;
         self.segment_ord = segment_ord;
         // Capture offsets for the initial document position (before any advance() call)
         let doc = self.postings.doc();
@@ -129,7 +133,7 @@ impl TermScorer {
                     .iter()
                     .map(|&(from, to)| [from as usize, to as usize])
                     .collect();
-                sink.insert(self.segment_ord, doc, offsets);
+                sink.insert(self.segment_ord, doc, &self.highlight_field_name, offsets);
             }
         }
     }

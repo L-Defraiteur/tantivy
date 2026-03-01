@@ -90,6 +90,7 @@ pub struct FuzzyTermQuery {
     /// is a starts with query
     prefix: bool,
     highlight_sink: Option<Arc<HighlightSink>>,
+    highlight_field_name: String,
 }
 
 impl std::fmt::Debug for FuzzyTermQuery {
@@ -112,6 +113,7 @@ impl FuzzyTermQuery {
             transposition_cost_one,
             prefix: false,
             highlight_sink: None,
+            highlight_field_name: String::new(),
         }
     }
 
@@ -123,11 +125,13 @@ impl FuzzyTermQuery {
             transposition_cost_one,
             prefix: true,
             highlight_sink: None,
+            highlight_field_name: String::new(),
         }
     }
 
-    pub fn with_highlight_sink(mut self, sink: Arc<HighlightSink>) -> Self {
+    pub fn with_highlight_sink(mut self, sink: Arc<HighlightSink>, field_name: String) -> Self {
         self.highlight_sink = Some(sink);
+        self.highlight_field_name = field_name;
         self
     }
 
@@ -194,7 +198,7 @@ impl FuzzyTermQuery {
             )
         };
         if let Some(ref sink) = self.highlight_sink {
-            weight = weight.with_highlight_sink(Arc::clone(sink));
+            weight = weight.with_highlight_sink(Arc::clone(sink), self.highlight_field_name.clone());
         }
         Ok(weight)
     }

@@ -59,6 +59,7 @@ pub struct RegexQuery {
     regex: Arc<Regex>,
     field: Field,
     highlight_sink: Option<Arc<HighlightSink>>,
+    highlight_field_name: String,
 }
 
 impl RegexQuery {
@@ -75,18 +76,20 @@ impl RegexQuery {
             regex: regex.into(),
             field,
             highlight_sink: None,
+            highlight_field_name: String::new(),
         }
     }
 
-    pub fn with_highlight_sink(mut self, sink: Arc<HighlightSink>) -> Self {
+    pub fn with_highlight_sink(mut self, sink: Arc<HighlightSink>, field_name: String) -> Self {
         self.highlight_sink = Some(sink);
+        self.highlight_field_name = field_name;
         self
     }
 
     fn specialized_weight(&self) -> AutomatonWeight<Regex> {
         let mut weight = AutomatonWeight::new(self.field, self.regex.clone());
         if let Some(ref sink) = self.highlight_sink {
-            weight = weight.with_highlight_sink(Arc::clone(sink));
+            weight = weight.with_highlight_sink(Arc::clone(sink), self.highlight_field_name.clone());
         }
         weight
     }

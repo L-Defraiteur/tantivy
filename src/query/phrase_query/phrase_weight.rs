@@ -16,6 +16,7 @@ pub struct PhraseWeight {
     similarity_weight_opt: Option<Bm25Weight>,
     slop: u32,
     highlight_sink: Option<Arc<HighlightSink>>,
+    highlight_field_name: String,
 }
 
 impl PhraseWeight {
@@ -31,11 +32,13 @@ impl PhraseWeight {
             similarity_weight_opt,
             slop,
             highlight_sink: None,
+            highlight_field_name: String::new(),
         }
     }
 
-    pub fn with_highlight_sink(mut self, sink: Arc<HighlightSink>) -> Self {
+    pub fn with_highlight_sink(mut self, sink: Arc<HighlightSink>, field_name: String) -> Self {
         self.highlight_sink = Some(sink);
+        self.highlight_field_name = field_name;
         self
     }
 
@@ -88,6 +91,7 @@ impl PhraseWeight {
                 fieldnorm_reader,
                 self.slop,
                 Arc::clone(sink),
+                self.highlight_field_name.clone(),
                 segment_ord,
             )))
         } else {

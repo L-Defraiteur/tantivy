@@ -63,6 +63,7 @@ pub struct PhraseScorer<TPostings: Postings> {
     positions_buffer: Vec<u32>,
     slops_buffer: Vec<u8>,
     highlight_sink: Option<Arc<HighlightSink>>,
+    highlight_field_name: String,
     segment_ord: u32,
 }
 
@@ -361,7 +362,7 @@ impl<TPostings: Postings> PhraseScorer<TPostings> {
         fieldnorm_reader: FieldNormReader,
         slop: u32,
     ) -> PhraseScorer<TPostings> {
-        Self::build(term_postings, similarity_weight_opt, fieldnorm_reader, slop, 0, None, 0)
+        Self::build(term_postings, similarity_weight_opt, fieldnorm_reader, slop, 0, None, String::new(), 0)
     }
 
     pub(crate) fn new_with_offset(
@@ -378,6 +379,7 @@ impl<TPostings: Postings> PhraseScorer<TPostings> {
             slop,
             offset,
             None,
+            String::new(),
             0,
         )
     }
@@ -388,6 +390,7 @@ impl<TPostings: Postings> PhraseScorer<TPostings> {
         fieldnorm_reader: FieldNormReader,
         slop: u32,
         highlight_sink: Arc<HighlightSink>,
+        highlight_field_name: String,
         segment_ord: u32,
     ) -> PhraseScorer<TPostings> {
         Self::build(
@@ -397,6 +400,7 @@ impl<TPostings: Postings> PhraseScorer<TPostings> {
             slop,
             0,
             Some(highlight_sink),
+            highlight_field_name,
             segment_ord,
         )
     }
@@ -408,6 +412,7 @@ impl<TPostings: Postings> PhraseScorer<TPostings> {
         slop: u32,
         offset: usize,
         highlight_sink: Option<Arc<HighlightSink>>,
+        highlight_field_name: String,
         segment_ord: u32,
     ) -> PhraseScorer<TPostings> {
         let num_docs = fieldnorm_reader.num_docs();
@@ -438,6 +443,7 @@ impl<TPostings: Postings> PhraseScorer<TPostings> {
             slops_buffer: Vec::with_capacity(100),
             positions_buffer: Vec::with_capacity(100),
             highlight_sink,
+            highlight_field_name,
             segment_ord,
         };
         if scorer.doc() != TERMINATED {
@@ -581,7 +587,7 @@ impl<TPostings: Postings> PhraseScorer<TPostings> {
             if let Some(ref sink) = self.highlight_sink {
                 all_offsets.sort();
                 all_offsets.dedup();
-                sink.insert(self.segment_ord, doc, all_offsets);
+                sink.insert(self.segment_ord, doc, &self.highlight_field_name, all_offsets);
             }
         }
     }

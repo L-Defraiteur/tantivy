@@ -63,6 +63,7 @@ pub struct TermQuery {
     term: Term,
     index_record_option: IndexRecordOption,
     highlight_sink: Option<Arc<HighlightSink>>,
+    highlight_field_name: String,
 }
 
 impl fmt::Debug for TermQuery {
@@ -78,11 +79,13 @@ impl TermQuery {
             term,
             index_record_option: segment_postings_options,
             highlight_sink: None,
+            highlight_field_name: String::new(),
         }
     }
 
-    pub fn with_highlight_sink(mut self, sink: Arc<HighlightSink>) -> Self {
+    pub fn with_highlight_sink(mut self, sink: Arc<HighlightSink>, field_name: String) -> Self {
         self.highlight_sink = Some(sink);
+        self.highlight_field_name = field_name;
         self
     }
 
@@ -129,7 +132,7 @@ impl TermQuery {
             scoring_enabled,
         );
         if let Some(ref sink) = self.highlight_sink {
-            weight = weight.with_highlight_sink(Arc::clone(sink));
+            weight = weight.with_highlight_sink(Arc::clone(sink), self.highlight_field_name.clone());
         }
         Ok(weight)
     }

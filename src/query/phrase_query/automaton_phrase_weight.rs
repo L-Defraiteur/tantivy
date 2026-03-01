@@ -58,6 +58,7 @@ pub struct AutomatonPhraseWeight {
     distance_budget: u32,
     strict_separators: bool,
     highlight_sink: Option<Arc<HighlightSink>>,
+    highlight_field_name: String,
 }
 
 impl AutomatonPhraseWeight {
@@ -74,6 +75,7 @@ impl AutomatonPhraseWeight {
         distance_budget: u32,
         strict_separators: bool,
         highlight_sink: Option<Arc<HighlightSink>>,
+        highlight_field_name: String,
     ) -> Self {
         AutomatonPhraseWeight {
             field,
@@ -88,6 +90,7 @@ impl AutomatonPhraseWeight {
             distance_budget,
             strict_separators,
             highlight_sink,
+            highlight_field_name,
         }
     }
 
@@ -235,6 +238,7 @@ impl AutomatonPhraseWeight {
                 store_reader,
                 text_field,
                 self.highlight_sink.clone(),
+                self.highlight_field_name.clone(),
                 segment_ord,
             ))))
         } else {
@@ -295,6 +299,7 @@ impl AutomatonPhraseWeight {
                 level.distance(),
                 boost,
                 self.highlight_sink.clone(),
+                self.highlight_field_name.clone(),
                 segment_ord,
             )))
         } else {

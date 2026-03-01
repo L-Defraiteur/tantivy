@@ -19,11 +19,11 @@ type HighlightKey = (u32, DocId);
 ///
 /// The caller creates an `Arc<HighlightSink>` and passes it to the query via
 /// `with_highlight_sink()`. During scoring, when a match is confirmed, the
-/// scorer inserts byte offsets into the sink. After search, the caller reads
-/// the sink to populate `SearchResult.highlights`.
+/// scorer inserts byte offsets into the sink tagged with a field name.
+/// After search, the caller reads the sink to populate highlights per field.
 #[derive(Debug)]
 pub struct HighlightSink {
-    data: Mutex<HashMap<HighlightKey, Vec<[usize; 2]>>>,
+    data: Mutex<HashMap<HighlightKey, Vec<(String, usize, usize)>>>,
     segment_counter: AtomicU32,
 }
 
@@ -44,20 +44,42 @@ impl HighlightSink {
     }
 
     /// Called by scorers when a match is confirmed.
-    pub fn insert(&self, segment_ord: u32, doc_id: DocId, offsets: Vec<[usize; 2]>) {
+    /// Appends offsets tagged with `field_name` (does not overwrite previous entries).
+    pub fn insert(
+        &self,
+        segment_ord: u32,
+        doc_id: DocId,
+        field_name: &str,
+        offsets: Vec<[usize; 2]>,
+    ) {
+        let entries: Vec<(String, usize, usize)> = offsets
+            .into_iter()
+            .map(|[s, e]| (field_name.to_string(), s, e))
+            .collect();
         self.data
             .lock()
             .unwrap()
-            .insert((segment_ord, doc_id), offsets);
+            .entry((segment_ord, doc_id))
+            .or_default()
+            .extend(entries);
     }
 
-    /// Called after search to retrieve offsets for a result.
-    pub fn get(&self, segment_ord: u32, doc_id: DocId) -> Option<Vec<[usize; 2]>> {
-        self.data
-            .lock()
-            .unwrap()
-            .get(&(segment_ord, doc_id))
-            .cloned()
+    /// Called after search to retrieve offsets grouped by field name.
+    pub fn get(
+        &self,
+        segment_ord: u32,
+        doc_id: DocId,
+    ) -> Option<HashMap<String, Vec<[usize; 2]>>> {
+        let data = self.data.lock().unwrap();
+        let entries = data.get(&(segment_ord, doc_id))?;
+        let mut by_field: HashMap<String, Vec<[usize; 2]>> = HashMap::new();
+        for (field, start, end) in entries {
+            by_field
+                .entry(field.clone())
+                .or_default()
+                .push([*start, *end]);
+        }
+        Some(by_field)
     }
 }
 
@@ -439,9 +461,30 @@ mod tests {
     #[test]
     fn test_highlight_sink_insert_get() {
         let sink = HighlightSink::new();
-        sink.insert(0, 42, vec![[5, 10], [20, 30]]);
-        let offsets = sink.get(0, 42).unwrap();
-        assert_eq!(offsets, vec![[5, 10], [20, 30]]);
+        sink.insert(0, 42, "body", vec![[5, 10], [20, 30]]);
+        let by_field = sink.get(0, 42).unwrap();
+        assert_eq!(by_field.len(), 1);
+        assert_eq!(by_field["body"], vec![[5, 10], [20, 30]]);
+    }
+
+    #[test]
+    fn test_highlight_sink_multi_field() {
+        let sink = HighlightSink::new();
+        sink.insert(0, 42, "title", vec![[0, 5]]);
+        sink.insert(0, 42, "body", vec![[100, 200], [500, 550]]);
+        let by_field = sink.get(0, 42).unwrap();
+        assert_eq!(by_field.len(), 2);
+        assert_eq!(by_field["title"], vec![[0, 5]]);
+        assert_eq!(by_field["body"], vec![[100, 200], [500, 550]]);
+    }
+
+    #[test]
+    fn test_highlight_sink_same_field_appends() {
+        let sink = HighlightSink::new();
+        sink.insert(0, 42, "body", vec![[5, 10]]);
+        sink.insert(0, 42, "body", vec![[20, 30]]);
+        let by_field = sink.get(0, 42).unwrap();
+        assert_eq!(by_field["body"], vec![[5, 10], [20, 30]]);
     }
 
     #[test]

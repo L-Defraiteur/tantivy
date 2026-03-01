@@ -28,6 +28,7 @@ pub struct PhraseQuery {
     phrase_terms: Vec<(usize, Term)>,
     slop: u32,
     highlight_sink: Option<Arc<HighlightSink>>,
+    highlight_field_name: String,
 }
 
 impl PhraseQuery {
@@ -65,11 +66,13 @@ impl PhraseQuery {
             phrase_terms: terms,
             slop,
             highlight_sink: None,
+            highlight_field_name: String::new(),
         }
     }
 
-    pub fn with_highlight_sink(mut self, sink: Arc<HighlightSink>) -> Self {
+    pub fn with_highlight_sink(mut self, sink: Arc<HighlightSink>, field_name: String) -> Self {
         self.highlight_sink = Some(sink);
+        self.highlight_field_name = field_name;
         self
     }
 
@@ -139,7 +142,7 @@ impl PhraseQuery {
             weight.slop(self.slop);
         }
         if let Some(ref sink) = self.highlight_sink {
-            weight = weight.with_highlight_sink(Arc::clone(sink));
+            weight = weight.with_highlight_sink(Arc::clone(sink), self.highlight_field_name.clone());
         }
         Ok(weight)
     }

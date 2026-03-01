@@ -23,6 +23,7 @@ pub struct AutomatonWeight<A> {
     // dictionary. This prevents terms from unrelated paths from matching the search criteria.
     json_path_bytes: Option<Box<[u8]>>,
     highlight_sink: Option<Arc<HighlightSink>>,
+    highlight_field_name: String,
 }
 
 impl<A> AutomatonWeight<A>
@@ -37,6 +38,7 @@ where
             automaton: automaton.into(),
             json_path_bytes: None,
             highlight_sink: None,
+            highlight_field_name: String::new(),
         }
     }
 
@@ -51,11 +53,13 @@ where
             automaton: automaton.into(),
             json_path_bytes: Some(json_path_bytes.to_vec().into_boxed_slice()),
             highlight_sink: None,
+            highlight_field_name: String::new(),
         }
     }
 
-    pub fn with_highlight_sink(mut self, sink: Arc<HighlightSink>) -> Self {
+    pub fn with_highlight_sink(mut self, sink: Arc<HighlightSink>, field_name: String) -> Self {
         self.highlight_sink = Some(sink);
+        self.highlight_field_name = field_name;
         self
     }
 
@@ -122,7 +126,7 @@ where
                             .iter()
                             .map(|&(from, to)| [from as usize, to as usize])
                             .collect();
-                        sink.insert(segment_ord, doc, offsets);
+                        sink.insert(segment_ord, doc, &self.highlight_field_name, offsets);
                     }
                     segment_postings.advance();
                 }

@@ -188,7 +188,7 @@ pub fn build_query(
         "contains" => {
             build_contains_query(config, schema, index, raw_pairs, ngram_pairs, highlight_sink)
         }
-        "boolean" => build_boolean_query(config, schema, index, raw_pairs, ngram_pairs),
+        "boolean" => build_boolean_query(config, schema, index, raw_pairs, ngram_pairs, highlight_sink),
         "parse" => build_parsed_query(config, schema, index),
         other => Err(format!("unknown query type: {other}")),
     }?;
@@ -224,7 +224,8 @@ fn build_term_query(
     let term = Term::from_field_text(field, &value.to_lowercase());
     let mut query = TermQuery::new(term, IndexRecordOption::WithFreqs);
     if let Some(sink) = highlight_sink {
-        query = query.with_highlight_sink(sink);
+        let field_name = config.field.clone().unwrap_or_default();
+        query = query.with_highlight_sink(sink, field_name);
     }
     Ok(Box::new(query))
 }
@@ -245,7 +246,8 @@ fn build_fuzzy_query(
     let term = Term::from_field_text(field, &value.to_lowercase());
     let mut query = FuzzyTermQuery::new(term, distance, true);
     if let Some(sink) = highlight_sink {
-        query = query.with_highlight_sink(sink);
+        let field_name = config.field.clone().unwrap_or_default();
+        query = query.with_highlight_sink(sink, field_name);
     }
     Ok(Box::new(query))
 }
@@ -275,7 +277,8 @@ fn build_phrase_query(
 
     let mut query = PhraseQuery::new(terms);
     if let Some(sink) = highlight_sink {
-        query = query.with_highlight_sink(sink);
+        let field_name = config.field.clone().unwrap_or_default();
+        query = query.with_highlight_sink(sink, field_name);
     }
     Ok(Box::new(query))
 }
@@ -370,7 +373,7 @@ fn build_contains_fuzzy(
             verification,
         );
         if let Some(sink) = highlight_sink {
-            query = query.with_highlight_sink(sink);
+            query = query.with_highlight_sink(sink, config.field.clone().unwrap_or_default());
         }
         return Ok(Box::new(query));
     }
@@ -395,7 +398,7 @@ fn build_contains_fuzzy(
             strict_separators,
         );
         if let Some(sink) = highlight_sink {
-            query = query.with_highlight_sink(sink);
+            query = query.with_highlight_sink(sink, config.field.clone().unwrap_or_default());
         }
         Ok(Box::new(query))
     } else {
@@ -406,7 +409,7 @@ fn build_contains_fuzzy(
             fuzzy_distance,
         );
         if let Some(sink) = highlight_sink {
-            query = query.with_highlight_sink(sink);
+            query = query.with_highlight_sink(sink, config.field.clone().unwrap_or_default());
         }
         Ok(Box::new(query))
     }
@@ -460,7 +463,7 @@ fn build_contains_regex(
             verification,
         );
         if let Some(sink) = highlight_sink {
-            query = query.with_highlight_sink(sink);
+            query = query.with_highlight_sink(sink, config.field.clone().unwrap_or_default());
         }
         return Ok(Box::new(query));
     }
@@ -469,7 +472,7 @@ fn build_contains_regex(
     let mut query = RegexQuery::from_pattern(&format!("(?i){pattern}"), field)
         .map_err(|e| format!("invalid regex: {e}"))?;
     if let Some(sink) = highlight_sink {
-        query = query.with_highlight_sink(sink);
+        query = query.with_highlight_sink(sink, config.field.clone().unwrap_or_default());
     }
     Ok(Box::new(query) as Box<dyn Query>)
 }
@@ -501,7 +504,7 @@ fn build_regex_query(
     let mut query = RegexQuery::from_pattern(pattern, field)
         .map_err(|e| format!("invalid regex: {e}"))?;
     if let Some(sink) = highlight_sink {
-        query = query.with_highlight_sink(sink);
+        query = query.with_highlight_sink(sink, config.field.clone().unwrap_or_default());
     }
     Ok(Box::new(query) as Box<dyn Query>)
 }
@@ -512,17 +515,18 @@ fn build_boolean_query(
     index: &Index,
     raw_pairs: &[(String, String)],
     ngram_pairs: &[(String, String)],
+    highlight_sink: Option<Arc<HighlightSink>>,
 ) -> Result<Box<dyn Query>, String> {
     let mut clauses: Vec<(Occur, Box<dyn Query>)> = Vec::new();
 
     if let Some(ref must) = config.must {
         for sub in must {
-            clauses.push((Occur::Must, build_query(sub, schema, index, raw_pairs, ngram_pairs, None)?));
+            clauses.push((Occur::Must, build_query(sub, schema, index, raw_pairs, ngram_pairs, highlight_sink.clone())?));
         }
     }
     if let Some(ref should) = config.should {
         for sub in should {
-            clauses.push((Occur::Should, build_query(sub, schema, index, raw_pairs, ngram_pairs, None)?));
+            clauses.push((Occur::Should, build_query(sub, schema, index, raw_pairs, ngram_pairs, highlight_sink.clone())?));
         }
     }
     if let Some(ref must_not) = config.must_not {

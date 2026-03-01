@@ -30,6 +30,7 @@ pub struct AutomatonPhraseQuery {
     distance_budget: u32,
     strict_separators: bool,
     highlight_sink: Option<Arc<HighlightSink>>,
+    highlight_field_name: String,
 }
 
 impl AutomatonPhraseQuery {
@@ -58,6 +59,7 @@ impl AutomatonPhraseQuery {
             distance_budget: 0,
             strict_separators: true,
             highlight_sink: None,
+            highlight_field_name: String::new(),
         }
     }
 
@@ -93,12 +95,14 @@ impl AutomatonPhraseQuery {
             distance_budget,
             strict_separators,
             highlight_sink: None,
+            highlight_field_name: String::new(),
         }
     }
 
     /// Attach a highlight sink to capture byte offsets during scoring.
-    pub fn with_highlight_sink(mut self, sink: Arc<HighlightSink>) -> Self {
+    pub fn with_highlight_sink(mut self, sink: Arc<HighlightSink>, field_name: String) -> Self {
         self.highlight_sink = Some(sink);
+        self.highlight_field_name = field_name;
         self
     }
 
@@ -163,6 +167,7 @@ impl AutomatonPhraseQuery {
             self.distance_budget,
             self.strict_separators,
             self.highlight_sink.clone(),
+            self.highlight_field_name.clone(),
         ))
     }
 }

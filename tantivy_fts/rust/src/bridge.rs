@@ -348,7 +348,6 @@ fn search_with_highlights(
         .map_err(|e| format!("invalid query JSON: {e}"))?;
 
     let highlight_sink = Arc::new(HighlightSink::new());
-    let highlight_field = config.field.clone();
 
     let tantivy_query = query::build_query(
         &config,
@@ -366,7 +365,6 @@ fn search_with_highlights(
         &top_docs,
         &handle.schema,
         Some(&highlight_sink),
-        highlight_field.as_deref(),
     )
 }
 
@@ -404,7 +402,6 @@ fn search_filtered_with_highlights(
         .map_err(|e| format!("invalid query JSON: {e}"))?;
 
     let highlight_sink = Arc::new(HighlightSink::new());
-    let highlight_field = config.field.clone();
 
     let tantivy_query = query::build_query(
         &config,
@@ -423,7 +420,6 @@ fn search_filtered_with_highlights(
         &top_docs,
         &handle.schema,
         Some(&highlight_sink),
-        highlight_field.as_deref(),
     )
 }
 
@@ -490,7 +486,6 @@ fn collect_search_results_with_highlights(
     top_docs: &[(f32, DocAddress)],
     schema: &ld_tantivy::schema::Schema,
     highlight_sink: Option<&HighlightSink>,
-    highlight_field: Option<&str>,
 ) -> Result<Vec<ffi::SearchResultWithHighlights>, String> {
     let nid_field = schema
         .get_field(NODE_ID_FIELD)
@@ -503,18 +498,21 @@ fn collect_search_results_with_highlights(
 
         let highlights = highlight_sink
             .and_then(|sink| {
-                let offsets = sink.get(doc_addr.segment_ord, doc_addr.doc_id)?;
-                let field_name = highlight_field?;
-                Some(vec![ffi::FieldHighlights {
-                    field_name: field_name.to_string(),
-                    ranges: offsets
-                        .into_iter()
-                        .map(|[s, e]| ffi::HighlightRange {
-                            start: s as u32,
-                            end: e as u32,
-                        })
-                        .collect(),
-                }])
+                let by_field = sink.get(doc_addr.segment_ord, doc_addr.doc_id)?;
+                let entries: Vec<ffi::FieldHighlights> = by_field
+                    .into_iter()
+                    .map(|(field_name, offsets)| ffi::FieldHighlights {
+                        field_name,
+                        ranges: offsets
+                            .into_iter()
+                            .map(|[s, e]| ffi::HighlightRange {
+                                start: s as u32,
+                                end: e as u32,
+                            })
+                            .collect(),
+                    })
+                    .collect();
+                if entries.is_empty() { None } else { Some(entries) }
             })
             .unwrap_or_default();
 

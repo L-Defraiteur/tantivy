@@ -44,6 +44,7 @@ pub struct ContainsScorer<TPostings: Postings> {
 
     // Highlighting
     highlight_sink: Option<Arc<HighlightSink>>,
+    highlight_field_name: String,
     segment_ord: u32,
 }
 
@@ -61,6 +62,7 @@ impl<TPostings: Postings> ContainsScorer<TPostings> {
         store_reader: StoreReader,
         field: Field,
         highlight_sink: Option<Arc<HighlightSink>>,
+        highlight_field_name: String,
         segment_ord: u32,
     ) -> ContainsScorer<TPostings> {
         let num_docs = fieldnorm_reader.num_docs();
@@ -95,6 +97,7 @@ impl<TPostings: Postings> ContainsScorer<TPostings> {
             similarity_weight_opt,
             phrase_count: 0,
             highlight_sink,
+            highlight_field_name,
             segment_ord,
         };
         if scorer.doc() != TERMINATED && !scorer.phrase_match() {
@@ -365,6 +368,7 @@ impl<TPostings: Postings> ContainsScorer<TPostings> {
                 sink.insert(
                     self.segment_ord,
                     self.intersection_docset.doc(),
+                    &self.highlight_field_name,
                     offsets,
                 );
             }
@@ -431,6 +435,7 @@ pub struct ContainsSingleScorer {
     cascade_distance: u32,
     boost: Score,
     highlight_sink: Option<Arc<HighlightSink>>,
+    highlight_field_name: String,
     segment_ord: u32,
 }
 
@@ -447,6 +452,7 @@ impl ContainsSingleScorer {
         cascade_distance: u32,
         boost: Score,
         highlight_sink: Option<Arc<HighlightSink>>,
+        highlight_field_name: String,
         segment_ord: u32,
     ) -> ContainsSingleScorer {
         let mut scorer = ContainsSingleScorer {
@@ -461,6 +467,7 @@ impl ContainsSingleScorer {
             cascade_distance,
             boost,
             highlight_sink,
+            highlight_field_name,
             segment_ord,
         };
         // Advance to the first valid doc
@@ -549,7 +556,7 @@ impl ContainsSingleScorer {
             }
 
             if let Some(ref sink) = self.highlight_sink {
-                sink.insert(self.segment_ord, self.bitset_docset.doc(), vec![[start, end]]);
+                sink.insert(self.segment_ord, self.bitset_docset.doc(), &self.highlight_field_name, vec![[start, end]]);
             }
             return true;
         }

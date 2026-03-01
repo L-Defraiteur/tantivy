@@ -147,6 +147,7 @@ pub struct NgramContainsQuery {
     trigram_sources: Vec<String>,
     verification: VerificationMode,
     highlight_sink: Option<Arc<HighlightSink>>,
+    highlight_field_name: String,
 }
 
 impl NgramContainsQuery {
@@ -172,12 +173,14 @@ impl NgramContainsQuery {
             trigram_sources,
             verification,
             highlight_sink: None,
+            highlight_field_name: String::new(),
         }
     }
 
     /// Attach a highlight sink to capture byte offsets during scoring.
-    pub fn with_highlight_sink(mut self, sink: Arc<HighlightSink>) -> Self {
+    pub fn with_highlight_sink(mut self, sink: Arc<HighlightSink>, field_name: String) -> Self {
         self.highlight_sink = Some(sink);
+        self.highlight_field_name = field_name;
         self
     }
 }
@@ -213,6 +216,7 @@ impl Query for NgramContainsQuery {
             trigram_sources: self.trigram_sources.clone(),
             verification: self.verification.clone(),
             highlight_sink: self.highlight_sink.clone(),
+            highlight_field_name: self.highlight_field_name.clone(),
             bm25_weight,
         }))
     }
@@ -227,6 +231,7 @@ struct NgramContainsWeight {
     trigram_sources: Vec<String>,
     verification: VerificationMode,
     highlight_sink: Option<Arc<HighlightSink>>,
+    highlight_field_name: String,
     bm25_weight: Bm25Weight,
 }
 
@@ -312,6 +317,7 @@ impl Weight for NgramContainsWeight {
             self.bm25_weight.boost_by(boost),
             fieldnorm_reader,
             self.highlight_sink.clone(),
+            self.highlight_field_name.clone(),
             segment_ord,
         )))
     }
@@ -335,6 +341,7 @@ fn count_single_token_fuzzy(
     doc_tokens: &[(usize, usize)],
     params: &FuzzyParams,
     highlight_sink: &Option<Arc<HighlightSink>>,
+    highlight_field_name: &str,
     segment_ord: u32,
     doc_id: DocId,
 ) -> u32 {
@@ -397,7 +404,7 @@ fn count_single_token_fuzzy(
 
         count += 1;
         if let Some(sink) = highlight_sink {
-            sink.insert(segment_ord, doc_id, vec![[start, end]]);
+            sink.insert(segment_ord, doc_id, highlight_field_name, vec![[start, end]]);
         }
     }
     count
@@ -409,6 +416,7 @@ fn count_multi_token_fuzzy(
     doc_tokens: &[(usize, usize)],
     params: &FuzzyParams,
     highlight_sink: &Option<Arc<HighlightSink>>,
+    highlight_field_name: &str,
     segment_ord: u32,
     doc_id: DocId,
 ) -> u32 {
@@ -425,6 +433,7 @@ fn count_multi_token_fuzzy(
             start_idx,
             params,
             highlight_sink,
+            highlight_field_name,
             segment_ord,
             doc_id,
         ) {
@@ -441,6 +450,7 @@ fn check_at_position_fuzzy(
     start_idx: usize,
     params: &FuzzyParams,
     highlight_sink: &Option<Arc<HighlightSink>>,
+    highlight_field_name: &str,
     segment_ord: u32,
     doc_id: DocId,
 ) -> bool {
@@ -534,7 +544,7 @@ fn check_at_position_fuzzy(
                 [s, e]
             })
             .collect();
-        sink.insert(segment_ord, doc_id, offsets);
+        sink.insert(segment_ord, doc_id, highlight_field_name, offsets);
     }
     true
 }
@@ -550,6 +560,7 @@ fn verify_regex(
     stored_text: &str,
     params: &RegexParams,
     highlight_sink: &Option<Arc<HighlightSink>>,
+    highlight_field_name: &str,
     segment_ord: u32,
     doc_id: DocId,
 ) -> u32 {
@@ -593,7 +604,7 @@ fn verify_regex(
                     .iter()
                     .map(|m| [m.start(), m.end()])
                     .collect();
-                sink.insert(segment_ord, doc_id, offsets);
+                sink.insert(segment_ord, doc_id, highlight_field_name, offsets);
             }
             // When only fuzzy matched (tf_regex == 0), we don't have precise byte offsets.
         }
@@ -614,6 +625,7 @@ struct NgramContainsScorer {
     fieldnorm_reader: FieldNormReader,
     last_tf: u32,
     highlight_sink: Option<Arc<HighlightSink>>,
+    highlight_field_name: String,
     segment_ord: u32,
 }
 
@@ -626,6 +638,7 @@ impl NgramContainsScorer {
         bm25_weight: Bm25Weight,
         fieldnorm_reader: FieldNormReader,
         highlight_sink: Option<Arc<HighlightSink>>,
+        highlight_field_name: String,
         segment_ord: u32,
     ) -> Self {
         let mut scorer = NgramContainsScorer {
@@ -638,6 +651,7 @@ impl NgramContainsScorer {
             fieldnorm_reader,
             last_tf: 0,
             highlight_sink,
+            highlight_field_name,
             segment_ord,
         };
         // Advance to first valid doc.
@@ -676,6 +690,7 @@ impl NgramContainsScorer {
                         &doc_tokens,
                         params,
                         &self.highlight_sink,
+                        &self.highlight_field_name,
                         self.segment_ord,
                         doc_id,
                     )
@@ -685,6 +700,7 @@ impl NgramContainsScorer {
                         &doc_tokens,
                         params,
                         &self.highlight_sink,
+                        &self.highlight_field_name,
                         self.segment_ord,
                         doc_id,
                     )
@@ -695,6 +711,7 @@ impl NgramContainsScorer {
                     stored_text,
                     params,
                     &self.highlight_sink,
+                    &self.highlight_field_name,
                     self.segment_ord,
                     doc_id,
                 )
@@ -767,14 +784,14 @@ mod tests {
     #[test]
     fn test_regex_pure_match() {
         let params = make_regex_params(r"program[a-z]+", vec!["program"], 0);
-        let tf = verify_regex("Rust is a systems programming language", &params, &None, 0, 0);
+        let tf = verify_regex("Rust is a systems programming language", &params, &None, "", 0, 0);
         assert_eq!(tf, 1); // "programming" matches
     }
 
     #[test]
     fn test_regex_pure_no_match() {
         let params = make_regex_params(r"program[a-z]+", vec!["program"], 0);
-        let tf = verify_regex("the cat sat on the mat", &params, &None, 0, 0);
+        let tf = verify_regex("the cat sat on the mat", &params, &None, "", 0, 0);
         assert_eq!(tf, 0);
     }
 
@@ -785,6 +802,7 @@ mod tests {
             "Programming in Rust: a programmer's guide to programming",
             &params,
             &None,
+            "",
             0,
             0,
         );
@@ -794,7 +812,7 @@ mod tests {
     #[test]
     fn test_regex_case_insensitive() {
         let params = make_regex_params(r"rust", vec!["rust"], 0);
-        let tf = verify_regex("Rust is great", &params, &None, 0, 0);
+        let tf = verify_regex("Rust is great", &params, &None, "", 0, 0);
         assert_eq!(tf, 1);
     }
 
@@ -805,7 +823,7 @@ mod tests {
         // Pattern has typo "programing" (one m) — regex won't match "programming"
         // but fuzzy on literal "programing" with distance=1 should match.
         let params = make_regex_params(r"programing[a-z]+", vec!["programing"], 1);
-        let tf = verify_regex("Rust is a systems programming language", &params, &None, 0, 0);
+        let tf = verify_regex("Rust is a systems programming language", &params, &None, "", 0, 0);
         assert!(tf > 0, "hybrid should match via fuzzy on literal");
     }
 
@@ -814,14 +832,14 @@ mod tests {
         // Pattern is correct — regex matches directly, fuzzy also matches.
         // tf = max(regex, fuzzy).
         let params = make_regex_params(r"program[a-z]+", vec!["program"], 1);
-        let tf = verify_regex("Rust programming is fun", &params, &None, 0, 0);
+        let tf = verify_regex("Rust programming is fun", &params, &None, "", 0, 0);
         assert!(tf > 0);
     }
 
     #[test]
     fn test_regex_hybrid_no_match() {
         let params = make_regex_params(r"python[a-z]+", vec!["python"], 1);
-        let tf = verify_regex("Rust is a systems programming language", &params, &None, 0, 0);
+        let tf = verify_regex("Rust is a systems programming language", &params, &None, "", 0, 0);
         assert_eq!(tf, 0);
     }
 
@@ -832,9 +850,10 @@ mod tests {
         let sink = Arc::new(HighlightSink::new());
         let params = make_regex_params(r"program[a-z]+", vec!["program"], 0);
         let text = "Rust programming is fun";
-        let tf = verify_regex(text, &params, &Some(sink.clone()), 0, 42);
+        let tf = verify_regex(text, &params, &Some(sink.clone()), "", 0, 42);
         assert_eq!(tf, 1);
-        let offsets = sink.get(0, 42).expect("should have highlights");
+        let by_field = sink.get(0, 42).expect("should have highlights");
+        let offsets = by_field.get("").expect("should have field offsets");
         assert_eq!(offsets.len(), 1);
         // "programming" starts at index 5 in "Rust programming is fun"
         assert_eq!(offsets[0], [5, 16]);
@@ -845,28 +864,28 @@ mod tests {
     #[test]
     fn test_regex_empty_text() {
         let params = make_regex_params(r"program[a-z]+", vec!["program"], 0);
-        let tf = verify_regex("", &params, &None, 0, 0);
+        let tf = verify_regex("", &params, &None, "", 0, 0);
         assert_eq!(tf, 0);
     }
 
     #[test]
     fn test_regex_dot_star() {
         let params = make_regex_params(r".*", vec![], 0);
-        let tf = verify_regex("anything", &params, &None, 0, 0);
+        let tf = verify_regex("anything", &params, &None, "", 0, 0);
         assert!(tf > 0); // .* matches everything
     }
 
     #[test]
     fn test_regex_word_boundary() {
         let params = make_regex_params(r"\brust\b", vec!["rust"], 0);
-        let tf = verify_regex("Rust is great but rusty is not", &params, &None, 0, 0);
+        let tf = verify_regex("Rust is great but rusty is not", &params, &None, "", 0, 0);
         assert_eq!(tf, 1); // "Rust" matches, "rusty" does not
     }
 
     #[test]
     fn test_regex_unicode() {
         let params = make_regex_params(r"café", vec!["café"], 0);
-        let tf = verify_regex("I love café au lait", &params, &None, 0, 0);
+        let tf = verify_regex("I love café au lait", &params, &None, "", 0, 0);
         assert_eq!(tf, 1);
     }
 
@@ -875,7 +894,7 @@ mod tests {
         // Regex "xyz[0-9]+" won't match any text, but fuzzy on literal "database"
         // with distance=1 should match "databse" (typo).
         let params = make_regex_params(r"databse", vec!["databse"], 1);
-        let tf = verify_regex("Graph databases store data", &params, &None, 0, 0);
+        let tf = verify_regex("Graph databases store data", &params, &None, "", 0, 0);
         // "databse" is distance 1 from "database" (substring of "databases")
         assert!(tf > 0, "hybrid should match via fuzzy on literal");
     }
@@ -885,9 +904,10 @@ mod tests {
         let sink = Arc::new(HighlightSink::new());
         let params = make_regex_params(r"[a-z]+ing", vec!["ing"], 0);
         let text = "programming and testing are fun";
-        let tf = verify_regex(text, &params, &Some(sink.clone()), 0, 99);
+        let tf = verify_regex(text, &params, &Some(sink.clone()), "", 0, 99);
         assert_eq!(tf, 2); // "programming" and "testing"
-        let offsets = sink.get(0, 99).expect("should have highlights");
+        let by_field = sink.get(0, 99).expect("should have highlights");
+        let offsets = by_field.get("").expect("should have field offsets");
         assert_eq!(offsets.len(), 2);
     }
 
@@ -918,7 +938,7 @@ mod tests {
         let tokens = tokenize_raw(text);
         let params = make_fuzzy_params(vec!["programming"], vec![], "", "", 1, 1);
         assert_eq!(
-            count_single_token_fuzzy(text, &tokens, &params, &None, 0, 0),
+            count_single_token_fuzzy(text, &tokens, &params, &None, "", 0, 0),
             1
         );
     }
@@ -929,7 +949,7 @@ mod tests {
         let tokens = tokenize_raw(text);
         let params = make_fuzzy_params(vec!["programing"], vec![], "", "", 1, 1);
         assert_eq!(
-            count_single_token_fuzzy(text, &tokens, &params, &None, 0, 0),
+            count_single_token_fuzzy(text, &tokens, &params, &None, "", 0, 0),
             1
         );
     }
@@ -940,7 +960,7 @@ mod tests {
         let tokens = tokenize_raw(text);
         let params = make_fuzzy_params(vec!["python"], vec![], "", "", 1, 1);
         assert_eq!(
-            count_single_token_fuzzy(text, &tokens, &params, &None, 0, 0),
+            count_single_token_fuzzy(text, &tokens, &params, &None, "", 0, 0),
             0
         );
     }
@@ -952,7 +972,7 @@ mod tests {
         // "program" is a substring of both "programming" and "programmer"
         let params = make_fuzzy_params(vec!["program"], vec![], "", "", 1, 1);
         assert_eq!(
-            count_single_token_fuzzy(text, &tokens, &params, &None, 0, 0),
+            count_single_token_fuzzy(text, &tokens, &params, &None, "", 0, 0),
             2
         );
     }
@@ -964,7 +984,7 @@ mod tests {
         // distance=0: "programing" is not exact, not a substring
         let params = make_fuzzy_params(vec!["programing"], vec![], "", "", 0, 0);
         assert_eq!(
-            count_single_token_fuzzy(text, &tokens, &params, &None, 0, 0),
+            count_single_token_fuzzy(text, &tokens, &params, &None, "", 0, 0),
             0
         );
     }
@@ -976,9 +996,10 @@ mod tests {
         let tokens = tokenize_raw(text);
         let params = make_fuzzy_params(vec!["programming"], vec![], "", "", 1, 1);
         let tf =
-            count_single_token_fuzzy(text, &tokens, &params, &Some(sink.clone()), 0, 42);
+            count_single_token_fuzzy(text, &tokens, &params, &Some(sink.clone()), "", 0, 42);
         assert_eq!(tf, 1);
-        let offsets = sink.get(0, 42).expect("should have highlights");
+        let by_field = sink.get(0, 42).expect("should have highlights");
+        let offsets = by_field.get("").expect("should have field offsets");
         assert_eq!(offsets.len(), 1);
         assert_eq!(offsets[0], [5, 16]); // "programming" at bytes 5..16
     }
@@ -992,7 +1013,7 @@ mod tests {
         let params =
             make_fuzzy_params(vec!["systems", "programming"], vec![" "], "", "", 1, 1);
         assert_eq!(
-            count_multi_token_fuzzy(text, &tokens, &params, &None, 0, 0),
+            count_multi_token_fuzzy(text, &tokens, &params, &None, "", 0, 0),
             1
         );
     }
@@ -1004,7 +1025,7 @@ mod tests {
         let params =
             make_fuzzy_params(vec!["sistems", "programing"], vec![" "], "", "", 1, 2);
         assert_eq!(
-            count_multi_token_fuzzy(text, &tokens, &params, &None, 0, 0),
+            count_multi_token_fuzzy(text, &tokens, &params, &None, "", 0, 0),
             1
         );
     }
@@ -1017,7 +1038,7 @@ mod tests {
         let params =
             make_fuzzy_params(vec!["sistems", "programing"], vec![" "], "", "", 1, 1);
         assert_eq!(
-            count_multi_token_fuzzy(text, &tokens, &params, &None, 0, 0),
+            count_multi_token_fuzzy(text, &tokens, &params, &None, "", 0, 0),
             0
         );
     }
@@ -1029,7 +1050,7 @@ mod tests {
         let params =
             make_fuzzy_params(vec!["machine", "learning"], vec![" "], "", "", 1, 1);
         assert_eq!(
-            count_multi_token_fuzzy(text, &tokens, &params, &None, 0, 0),
+            count_multi_token_fuzzy(text, &tokens, &params, &None, "", 0, 0),
             0
         );
     }
@@ -1041,7 +1062,7 @@ mod tests {
         let params =
             make_fuzzy_params(vec!["systems", "programming"], vec![" "], "", "", 1, 1);
         assert_eq!(
-            count_multi_token_fuzzy(text, &tokens, &params, &None, 0, 0),
+            count_multi_token_fuzzy(text, &tokens, &params, &None, "", 0, 0),
             0
         );
     }
@@ -1054,9 +1075,10 @@ mod tests {
         let params =
             make_fuzzy_params(vec!["systems", "programming"], vec![" "], "", "", 1, 1);
         let tf =
-            count_multi_token_fuzzy(text, &tokens, &params, &Some(sink.clone()), 0, 42);
+            count_multi_token_fuzzy(text, &tokens, &params, &Some(sink.clone()), "", 0, 42);
         assert_eq!(tf, 1);
-        let offsets = sink.get(0, 42).expect("should have highlights");
+        let by_field = sink.get(0, 42).expect("should have highlights");
+        let offsets = by_field.get("").expect("should have field offsets");
         assert_eq!(offsets.len(), 2);
         assert_eq!(offsets[0], [10, 17]); // "systems" at bytes 10..17
         assert_eq!(offsets[1], [18, 29]); // "programming" at bytes 18..29

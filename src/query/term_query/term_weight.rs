@@ -19,6 +19,7 @@ pub struct TermWeight {
     similarity_weight: Bm25Weight,
     scoring_enabled: bool,
     highlight_sink: Option<Arc<HighlightSink>>,
+    highlight_field_name: String,
 }
 
 enum TermOrEmptyOrAllScorer {
@@ -243,11 +244,13 @@ impl TermWeight {
             similarity_weight,
             scoring_enabled,
             highlight_sink: None,
+            highlight_field_name: String::new(),
         }
     }
 
-    pub fn with_highlight_sink(mut self, sink: Arc<HighlightSink>) -> Self {
+    pub fn with_highlight_sink(mut self, sink: Arc<HighlightSink>, field_name: String) -> Self {
         self.highlight_sink = Some(sink);
+        self.highlight_field_name = field_name;
         self
     }
 
@@ -313,7 +316,7 @@ impl TermWeight {
         let mut scorer = TermScorer::new(segment_postings, fieldnorm_reader, similarity_weight);
         if let Some(ref sink) = self.highlight_sink {
             let segment_ord = sink.next_segment();
-            scorer = scorer.with_highlight_sink(Arc::clone(sink), segment_ord);
+            scorer = scorer.with_highlight_sink(Arc::clone(sink), self.highlight_field_name.clone(), segment_ord);
         }
         Ok(TermOrEmptyOrAllScorer::TermScorer(Box::new(scorer)))
     }
