@@ -117,6 +117,17 @@ mod ffi {
             limit: u32,
         ) -> Result<Vec<SearchResultWithHighlights>>;
 
+        /// Typed search — bypasses JSON serialization/deserialization.
+        /// Modes: "contains", "contains_split", "fuzzy", "regex", "parse".
+        fn search_typed_with_highlights(
+            handle: &TantivyHandle,
+            field: &str,
+            value: &str,
+            mode: &str,
+            distance: u8,
+            limit: u32,
+        ) -> Result<Vec<SearchResultWithHighlights>>;
+
         fn search_filtered(
             handle: &TantivyHandle,
             query_json: &str,
@@ -367,6 +378,105 @@ fn search_with_highlights(
         Some(&highlight_sink),
     )
 }
+
+// ── Typed search (no JSON) ───────────────────────────────────────────────
+
+fn build_typed_query_config(
+    field: &str,
+    value: &str,
+    mode: &str,
+    distance: u8,
+) -> Result<query::QueryConfig, String> {
+    match mode {
+        "contains" => Ok(query::QueryConfig {
+            query_type: "contains".into(),
+            field: Some(field.into()),
+            value: Some(value.into()),
+            ..Default::default()
+        }),
+        "contains_split" => {
+            let words: Vec<&str> = value.split_whitespace().collect();
+            if words.len() <= 1 {
+                return Ok(query::QueryConfig {
+                    query_type: "contains".into(),
+                    field: Some(field.into()),
+                    value: Some(value.into()),
+                    ..Default::default()
+                });
+            }
+            let should: Vec<query::QueryConfig> = words
+                .iter()
+                .map(|w| query::QueryConfig {
+                    query_type: "contains".into(),
+                    field: Some(field.into()),
+                    value: Some(w.to_string()),
+                    ..Default::default()
+                })
+                .collect();
+            Ok(query::QueryConfig {
+                query_type: "boolean".into(),
+                should: Some(should),
+                ..Default::default()
+            })
+        }
+        "fuzzy" => Ok(query::QueryConfig {
+            query_type: "contains".into(),
+            field: Some(field.into()),
+            value: Some(value.into()),
+            distance: Some(distance),
+            ..Default::default()
+        }),
+        "regex" => Ok(query::QueryConfig {
+            query_type: "contains".into(),
+            field: Some(field.into()),
+            value: Some(value.into()),
+            regex: Some(true),
+            ..Default::default()
+        }),
+        "parse" => Ok(query::QueryConfig {
+            query_type: "parse".into(),
+            fields: Some(vec![field.into()]),
+            value: Some(value.into()),
+            ..Default::default()
+        }),
+        other => Err(format!(
+            "unknown search mode: {other}. Valid: contains, contains_split, fuzzy, regex, parse"
+        )),
+    }
+}
+
+fn search_typed_with_highlights(
+    handle: &TantivyHandle,
+    field: &str,
+    value: &str,
+    mode: &str,
+    distance: u8,
+    limit: u32,
+) -> Result<Vec<ffi::SearchResultWithHighlights>, String> {
+    let config = build_typed_query_config(field, value, mode, distance)?;
+
+    let highlight_sink = Arc::new(HighlightSink::new());
+
+    let tantivy_query = query::build_query(
+        &config,
+        &handle.schema,
+        &handle.index,
+        &handle.raw_field_pairs,
+        &handle.ngram_field_pairs,
+        Some(highlight_sink.clone()),
+    )?;
+
+    let searcher = handle.reader.searcher();
+    let top_docs = execute_top_docs(&searcher, tantivy_query.as_ref(), limit)?;
+    collect_search_results_with_highlights(
+        &searcher,
+        &top_docs,
+        &handle.schema,
+        Some(&highlight_sink),
+    )
+}
+
+// ── Filtered search ─────────────────────────────────────────────────────
 
 fn search_filtered(
     handle: &TantivyHandle,
