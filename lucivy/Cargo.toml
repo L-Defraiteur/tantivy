@@ -1,0 +1,20 @@
+[package]
+name = "lucivy"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Fast BM25 full-text search index for Python, powered by Tantivy"
+
+[lib]
+name = "lucivy"
+crate-type = ["cdylib"]
+
+[dependencies]
+tantivy-fts = { path = "../tantivy_fts/rust" }
+ld-tantivy = { path = "..", default-features = false, features = [
+    "stopwords",
+    "lz4-compression",
+    "stemmer",
+] }
+pyo3 = { version = "0.24", features = ["extension-module"] }
+serde_json = "1"

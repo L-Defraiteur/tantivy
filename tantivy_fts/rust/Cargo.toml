@@ -6,7 +6,7 @@ license = "MIT"
 description = "C FFI bindings for Tantivy full-text search, used as a rag3db extension"
 
 [lib]
-crate-type = ["staticlib"]
+crate-type = ["staticlib", "lib"]
 
 [dependencies]
 ld-tantivy = { path = "../..", default-features = false, features = [

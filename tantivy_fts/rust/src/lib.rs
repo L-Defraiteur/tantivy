@@ -5,7 +5,7 @@
 //! and linked into the rag3db C++ extension.
 
 mod bridge;
-mod directory;
-mod handle;
-mod query;
-mod tokenizer;
+pub mod directory;
+pub mod handle;
+pub mod query;
+pub mod tokenizer;
