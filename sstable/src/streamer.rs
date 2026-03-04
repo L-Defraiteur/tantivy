@@ -174,7 +174,7 @@ where
     term_ord: Option<TermOrdinal>,
     lower_bound: Bound<Vec<u8>>,
     upper_bound: Bound<Vec<u8>>,
-    // this field is used to please the type-interface of a dictionary in tantivy
+    // this field is used to please the type-interface of a dictionary in lucivy
     _lifetime: std::marker::PhantomData<&'a ()>,
 }
 

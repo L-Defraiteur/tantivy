@@ -1,7 +1,7 @@
 use binggan::{InputGroup, black_box};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
-use tantivy_columnar::column_index::{OptionalIndex, Set};
+use lucivy_columnar::column_index::{OptionalIndex, Set};
 
 const TOTAL_NUM_VALUES: u32 = 1_000_000;
 

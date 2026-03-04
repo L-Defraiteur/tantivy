@@ -11,7 +11,7 @@ pub const JSON_END_OF_PATH: u8 = 0u8;
 pub const JSON_END_OF_PATH_STR: &str =
     unsafe { std::str::from_utf8_unchecked(&[JSON_END_OF_PATH]) };
 
-/// Create a new JsonPathWriter, that creates flattened json paths for tantivy.
+/// Create a new JsonPathWriter, that creates flattened json paths for lucivy.
 #[derive(Clone, Debug, Default)]
 pub struct JsonPathWriter {
     path: String,

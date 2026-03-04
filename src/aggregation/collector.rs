@@ -9,7 +9,7 @@ use crate::aggregation::agg_data::{
 };
 use crate::collector::{Collector, SegmentCollector};
 use crate::index::SegmentReader;
-use crate::{DocId, SegmentOrdinal, TantivyError};
+use crate::{DocId, SegmentOrdinal, LucivyError};
 
 /// The default max bucket count, before the aggregation fails.
 pub const DEFAULT_BUCKET_LIMIT: u32 = 65000;
@@ -137,7 +137,7 @@ fn merge_fruits(
 pub struct AggregationSegmentCollector {
     aggs_with_accessor: AggregationsSegmentCtx,
     agg_collector: LowCardCachedSubAggs,
-    error: Option<TantivyError>,
+    error: Option<LucivyError>,
 }
 
 impl AggregationSegmentCollector {

@@ -5,7 +5,7 @@ build-backend = "maturin"
 [project]
 name = "lucivy"
 version = "0.1.0"
-description = "Fast BM25 full-text search index for Python, powered by Tantivy"
+description = "Fast BM25 full-text search index for Python, powered by Lucivy"
 requires-python = ">=3.9"
 
 [tool.maturin]

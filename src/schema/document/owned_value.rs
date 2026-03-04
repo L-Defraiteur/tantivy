@@ -465,7 +465,7 @@ impl<'a> Iterator for ObjectMapIter<'a> {
 mod tests {
     use super::*;
     use crate::schema::{BytesOptions, Schema};
-    use crate::{Document, TantivyDocument};
+    use crate::{Document, LucivyDocument};
 
     #[test]
     fn test_parse_bytes_doc() {
@@ -473,7 +473,7 @@ mod tests {
         let bytes_options = BytesOptions::default();
         let bytes_field = schema_builder.add_bytes_field("my_bytes", bytes_options);
         let schema = schema_builder.build();
-        let mut doc = TantivyDocument::default();
+        let mut doc = LucivyDocument::default();
         doc.add_bytes(bytes_field, "this is a test".as_bytes());
         let json_string = doc.to_json(&schema);
         assert_eq!(json_string, r#"{"my_bytes":["dGhpcyBpcyBhIHRlc3Q="]}"#);
@@ -485,7 +485,7 @@ mod tests {
         let bytes_options = BytesOptions::default();
         let bytes_field = schema_builder.add_bytes_field("my_bytes", bytes_options);
         let schema = schema_builder.build();
-        let mut doc = TantivyDocument::default();
+        let mut doc = LucivyDocument::default();
         doc.add_bytes(bytes_field, "".as_bytes());
         let json_string = doc.to_json(&schema);
 
@@ -498,7 +498,7 @@ mod tests {
         let bytes_options = BytesOptions::default();
         let bytes_field = schema_builder.add_bytes_field("my_bytes", bytes_options);
         let schema = schema_builder.build();
-        let mut doc = TantivyDocument::default();
+        let mut doc = LucivyDocument::default();
         doc.add_bytes(
             bytes_field,
             "A bigger test I guess\nspanning on multiple lines\nhoping this will work".as_bytes(),

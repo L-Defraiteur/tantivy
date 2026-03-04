@@ -9,7 +9,7 @@
 //! # Example
 //!
 //! ```
-//! use tantivy::aggregation::agg_req::Aggregations;
+//! use lucivy::aggregation::agg_req::Aggregations;
 //!
 //! let elasticsearch_compatible_json_req = r#"
 //! {

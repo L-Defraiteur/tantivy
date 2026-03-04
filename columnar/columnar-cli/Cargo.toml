@@ -1,11 +1,11 @@
 [package]
-name = "tantivy-columnar-cli"
+name = "lucivy-columnar-cli"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
 
 [dependencies]
-columnar = {path="../", package="tantivy-columnar"}
+columnar = {path="../", package="lucivy-columnar"}
 serde_json = "1"
 serde_json_borrow = {git="https://github.com/PSeitz/serde_json_borrow/"}
 

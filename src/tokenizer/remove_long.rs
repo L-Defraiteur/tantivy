@@ -1,6 +1,6 @@
 //! # Example
 //! ```rust
-//! use tantivy::tokenizer::*;
+//! use lucivy::tokenizer::*;
 //!
 //! let mut tokenizer = TextAnalyzer::builder(SimpleTokenizer::default())
 //!   .filter(RemoveLongFilter::limit(5))
@@ -96,7 +96,7 @@ mod tests {
 
     #[test]
     fn test_remove_long() {
-        let tokens = token_stream_helper("hello tantivy, happy searching!");
+        let tokens = token_stream_helper("hello toolong, happy searching!");
         assert_eq!(tokens.len(), 2);
         assert_token(&tokens[0], 0, "hello", 0, 5);
         assert_token(&tokens[1], 2, "happy", 15, 20);

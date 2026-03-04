@@ -1,5 +1,5 @@
 [package]
-name = "ld-tantivy-sstable"
+name = "ld-lucivy-sstable"
 version = "0.26.0"
 edition = "2024"
 license = "MIT"
@@ -7,13 +7,13 @@ homepage = "https://github.com/quickwit-oss/tantivy"
 repository = "https://github.com/quickwit-oss/tantivy"
 keywords = ["search", "information", "retrieval", "sstable"]
 categories = ["database-implementations", "data-structures", "compression"]
-description = "sstables for tantivy"
+description = "sstables for lucivy"
 
 [dependencies]
-common = { version = "0.26.0", path = "../common", package = "ld-tantivy-common" }
+common = { version = "0.26.0", path = "../common", package = "ld-lucivy-common" }
 futures-util = "0.3.30"
 itertools = "0.14.0"
-tantivy-bitpacker = { version = "0.26.0", path = "../bitpacker", package = "ld-tantivy-bitpacker" }
+lucivy-bitpacker = { version = "0.26.0", path = "../bitpacker", package = "ld-lucivy-bitpacker" }
 tantivy-fst = "0.5"
 # experimental gives us access to Decompressor::upper_bound
 zstd = { version = "0.13", optional = true, features = ["experimental"] }

@@ -3,7 +3,7 @@ use std::fmt::{self, Debug, Formatter};
 use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use super::segment_register::SegmentRegister;
-use crate::error::TantivyError;
+use crate::error::LucivyError;
 use crate::index::{SegmentId, SegmentMeta};
 use crate::indexer::delete_queue::DeleteCursor;
 use crate::indexer::SegmentEntry;
@@ -24,7 +24,7 @@ impl SegmentRegisters {
     /// Check if all the segments are committed or uncommitted.
     ///
     /// If some segment is missing or segments are in a different state (this should not happen
-    /// if tantivy is used correctly), returns `None`.
+    /// if lucivy is used correctly), returns `None`.
     fn segments_status(&self, segment_ids: &[SegmentId]) -> Option<SegmentsStatus> {
         if self.uncommitted.contains_all(segment_ids) {
             Some(SegmentsStatus::Uncommitted)
@@ -171,7 +171,7 @@ impl SegmentManager {
             let error_msg = "Merge operation sent for segments that are not all uncommitted or \
                              committed."
                 .to_string();
-            return Err(TantivyError::InvalidArgument(error_msg));
+            return Err(LucivyError::InvalidArgument(error_msg));
         }
 
         Ok(segment_entries)
@@ -194,7 +194,7 @@ impl SegmentManager {
             .segments_status(before_merge_segment_ids)
             .ok_or_else(|| {
                 warn!("couldn't find segment in SegmentManager");
-                crate::TantivyError::InvalidArgument(
+                crate::LucivyError::InvalidArgument(
                     "The segments that were merged could not be found in the SegmentManager. This \
                      is not necessarily a bug, and can happen after a rollback for instance."
                         .to_string(),

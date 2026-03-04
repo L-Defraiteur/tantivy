@@ -5,7 +5,7 @@
 //! each of your fields :
 //!
 //! ```rust
-//! use tantivy::schema::*;
+//! use lucivy::schema::*;
 //!
 //! let mut schema_builder = Schema::builder();
 //!
@@ -32,7 +32,7 @@
 //! let schema = schema_builder.build();
 //! ```
 //!
-//! By default, `tantivy` offers the following tokenizers:
+//! By default, `lucivy` offers the following tokenizers:
 //!
 //! ## `default`
 //!
@@ -53,7 +53,7 @@
 //! but is recommended to improve recall.
 //!
 //! # Custom tokenizer Library
-//! Avoid using tantivy as dependency and prefer `tantivy-tokenizer-api` instead.
+//! Avoid using lucivy as dependency and prefer `lucivy-tokenizer-api` instead.
 //!
 //! # Custom tokenizers
 //!
@@ -64,7 +64,7 @@
 //! For instance, the `en_stem` is defined as follows.
 //!
 //! ```rust
-//! use tantivy::tokenizer::*;
+//! use lucivy::tokenizer::*;
 //!
 //! let en_stem = TextAnalyzer::builder(SimpleTokenizer::default())
 //!     .filter(RemoveLongFilter::limit(40))
@@ -77,9 +77,9 @@
 //! register it with a name in your index's [`TokenizerManager`].
 //!
 //! ```rust
-//! # use tantivy::schema::Schema;
-//! # use tantivy::tokenizer::*;
-//! # use tantivy::Index;
+//! # use lucivy::schema::Schema;
+//! # use lucivy::tokenizer::*;
+//! # use lucivy::Index;
 //! #
 //! let custom_en_tokenizer = SimpleTokenizer::default();
 //! # let schema = Schema::builder().build();
@@ -97,9 +97,9 @@
 //! # Example
 //!
 //! ```rust
-//! use tantivy::schema::{Schema, IndexRecordOption, TextOptions, TextFieldIndexing};
-//! use tantivy::tokenizer::*;
-//! use tantivy::Index;
+//! use lucivy::schema::{Schema, IndexRecordOption, TextOptions, TextFieldIndexing};
+//! use lucivy::tokenizer::*;
+//! use lucivy::Index;
 //!
 //! let mut schema_builder = Schema::builder();
 //! let text_field_indexing = TextFieldIndexing::default()

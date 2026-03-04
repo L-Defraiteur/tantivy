@@ -165,16 +165,16 @@ impl<'de> Deserialize<'de> for KeyOrder {
 }
 
 // Transform a glob (`pattern*`, for example) into a regex::Regex (`^pattern.*$`)
-fn globbed_string_to_regex(glob: &str) -> Result<Regex, crate::TantivyError> {
+fn globbed_string_to_regex(glob: &str) -> Result<Regex, crate::LucivyError> {
     // Replace `*` glob with `.*` regex
     let sanitized = format!("^{}$", regex::escape(glob).replace(r"\*", ".*"));
     Regex::new(&sanitized.replace('*', ".*")).map_err(|e| {
-        crate::TantivyError::SchemaError(format!("Invalid regex '{glob}' in docvalue_fields: {e}"))
+        crate::LucivyError::SchemaError(format!("Invalid regex '{glob}' in docvalue_fields: {e}"))
     })
 }
 
 fn use_doc_value_fields_err(parameter: &str) -> crate::Result<()> {
-    Err(crate::TantivyError::AggregationError(
+    Err(crate::LucivyError::AggregationError(
         AggregationError::InvalidRequest(format!(
             "The `{parameter}` parameter is not supported, only `docvalue_fields` is supported in \
              `top_hits` aggregation"
@@ -182,7 +182,7 @@ fn use_doc_value_fields_err(parameter: &str) -> crate::Result<()> {
     ))
 }
 fn unsupported_err(parameter: &str) -> crate::Result<()> {
-    Err(crate::TantivyError::AggregationError(
+    Err(crate::LucivyError::AggregationError(
         AggregationError::InvalidRequest(format!(
             "The `{parameter}` parameter is not supported in the `top_hits` aggregation"
         )),

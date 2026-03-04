@@ -47,7 +47,7 @@ const HIGHEST_BIT: u64 = 1 << 63;
 
 /// Maps a `i64` to `u64`
 ///
-/// For simplicity, tantivy internally handles `i64` as `u64`.
+/// For simplicity, lucivy internally handles `i64` as `u64`.
 /// The mapping is defined by this function.
 ///
 /// Maps `i64` to `u64` so that
@@ -78,7 +78,7 @@ pub fn u64_to_i64(val: u64) -> i64 {
 
 /// Maps a `f64` to `u64`
 ///
-/// For simplicity, tantivy internally handles `f64` as `u64`.
+/// For simplicity, lucivy internally handles `f64` as `u64`.
 /// The mapping is defined by this function.
 ///
 /// Maps `f64` to `u64` in a monotonic manner, so that bytes lexical order is preserved.

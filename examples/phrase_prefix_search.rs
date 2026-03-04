@@ -1,7 +1,7 @@
-use tantivy::collector::TopDocs;
-use tantivy::query::QueryParser;
-use tantivy::schema::*;
-use tantivy::{doc, Index, IndexWriter, ReloadPolicy, Result};
+use lucivy::collector::TopDocs;
+use lucivy::query::QueryParser;
+use lucivy::schema::*;
+use lucivy::{doc, Index, IndexWriter, ReloadPolicy, Result};
 use tempfile::TempDir;
 
 fn main() -> Result<()> {
@@ -67,7 +67,7 @@ fn main() -> Result<()> {
     let mut titles = top_docs
         .into_iter()
         .map(|(_score, doc_address)| {
-            let doc = searcher.doc::<TantivyDocument>(doc_address)?;
+            let doc = searcher.doc::<LucivyDocument>(doc_address)?;
             let title = doc
                 .get_first(title)
                 .and_then(|v| v.as_str())

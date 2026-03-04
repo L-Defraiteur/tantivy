@@ -3,7 +3,7 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use common::{BinarySerializable, FixedSize, OwnedBytes};
-use tantivy_bitpacker::{BitPacker, compute_num_bits};
+use lucivy_bitpacker::{BitPacker, compute_num_bits};
 use tantivy_fst::raw::Fst;
 use tantivy_fst::{Automaton, IntoStreamer, Map, MapBuilder, Streamer};
 
@@ -489,7 +489,7 @@ impl BlockAddrBlockMetadata {
     }
 }
 
-// TODO move this function to tantivy_common?
+// TODO move this function to lucivy_common?
 #[inline(always)]
 fn extract_bits(data: &[u8], addr_bits: usize, num_bits: u8) -> u64 {
     assert!(num_bits <= 56);

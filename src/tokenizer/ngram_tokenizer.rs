@@ -1,5 +1,5 @@
 use super::{Token, TokenStream, Tokenizer};
-use crate::TantivyError;
+use crate::LucivyError;
 
 /// Tokenize the text by splitting words into n-grams of the given size(s)
 ///
@@ -32,7 +32,7 @@ use crate::TantivyError;
 /// # Example
 ///
 /// ```rust
-/// use tantivy::tokenizer::*;
+/// use lucivy::tokenizer::*;
 ///
 /// let mut tokenizer = NgramTokenizer::new(2, 3, false).unwrap();
 /// let mut stream = tokenizer.token_stream("hello");
@@ -99,12 +99,12 @@ impl NgramTokenizer {
         prefix_only: bool,
     ) -> crate::Result<NgramTokenizer> {
         if min_gram == 0 {
-            return Err(TantivyError::InvalidArgument(
+            return Err(LucivyError::InvalidArgument(
                 "min_gram must be greater than 0".to_string(),
             ));
         }
         if min_gram > max_gram {
-            return Err(TantivyError::InvalidArgument(
+            return Err(LucivyError::InvalidArgument(
                 "min_gram must not be greater than max_gram".to_string(),
             ));
         }

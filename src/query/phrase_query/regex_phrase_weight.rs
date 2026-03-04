@@ -69,7 +69,7 @@ impl RegexPhraseWeight {
         let mut num_terms = 0;
         for &(offset, ref term) in &self.phrase_terms {
             let regex = Regex::new(term)
-                .map_err(|e| crate::TantivyError::InvalidArgument(format!("Invalid regex: {e}")))?;
+                .map_err(|e| crate::LucivyError::InvalidArgument(format!("Invalid regex: {e}")))?;
 
             let automaton: AutomatonWeight<Regex> =
                 AutomatonWeight::new(self.field, Arc::new(regex));
@@ -80,7 +80,7 @@ impl RegexPhraseWeight {
             }
             num_terms += term_infos.len();
             if num_terms > self.max_expansions as usize {
-                return Err(crate::TantivyError::InvalidArgument(format!(
+                return Err(crate::LucivyError::InvalidArgument(format!(
                     "Phrase query exceeded max expansions {num_terms}"
                 )));
             }

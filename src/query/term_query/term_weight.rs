@@ -11,7 +11,7 @@ use crate::query::phrase_query::scoring_utils::HighlightSink;
 use crate::query::weight::{for_each_docset_buffered, for_each_scorer};
 use crate::query::{AllScorer, AllWeight, EmptyScorer, Explanation, Scorer, Weight};
 use crate::schema::IndexRecordOption;
-use crate::{DocId, Score, TantivyError, Term};
+use crate::{DocId, Score, LucivyError, Term};
 
 pub struct TermWeight {
     term: Term,
@@ -137,7 +137,7 @@ impl Weight for TermWeight {
             }
             TermOrEmptyOrAllScorer::Empty => {}
             TermOrEmptyOrAllScorer::AllMatch(_) => {
-                return Err(TantivyError::InvalidArgument(
+                return Err(LucivyError::InvalidArgument(
                     "for each pruning should only be called if scoring is enabled".to_string(),
                 ));
             }
@@ -222,7 +222,7 @@ impl Weight for TermWeight {
             }
             TermOrEmptyOrAllScorer::Empty => {}
             TermOrEmptyOrAllScorer::AllMatch(_) => {
-                return Err(TantivyError::InvalidArgument(
+                return Err(LucivyError::InvalidArgument(
                     "for each pruning should only be called if scoring is enabled".to_string(),
                 ));
             }

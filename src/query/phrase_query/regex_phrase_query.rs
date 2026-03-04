@@ -122,7 +122,7 @@ impl RegexPhraseQuery {
         let schema = enable_scoring.schema();
         let field_type = schema.get_field_entry(self.field).field_type().value_type();
         if field_type != Type::Str {
-            return Err(crate::TantivyError::SchemaError(format!(
+            return Err(crate::LucivyError::SchemaError(format!(
                 "RegexPhraseQuery can only be used with a field of type text currently, but got \
                  {field_type:?}"
             )));
@@ -136,7 +136,7 @@ impl RegexPhraseQuery {
             .unwrap_or(false);
         if !has_positions {
             let field_name = field_entry.name();
-            return Err(crate::TantivyError::SchemaError(format!(
+            return Err(crate::LucivyError::SchemaError(format!(
                 "Applied phrase query on field {field_name:?}, which does not have positions \
                  indexed"
             )));

@@ -8,7 +8,7 @@ use crate::schema::flags::{FastFlag, IndexedFlag, SchemaFlagList, StoredFlag};
 /// The precision of the indexed date/time values in the inverted index.
 pub const DATE_TIME_PRECISION_INDEXED: DateTimePrecision = DateTimePrecision::Seconds;
 
-/// Defines how DateTime field should be handled by tantivy.
+/// Defines how DateTime field should be handled by lucivy.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct DateOptions {
     indexed: bool,
@@ -51,7 +51,7 @@ impl DateOptions {
     /// Set the field as stored.
     ///
     /// Only the fields that are set as *stored* are
-    /// persisted into the Tantivy's store.
+    /// persisted into the Lucivy's store.
     #[must_use]
     pub fn set_stored(mut self) -> DateOptions {
         self.stored = true;

@@ -1,10 +1,10 @@
-//! Custom tokenizers for tantivy_fts.
+//! Custom tokenizers for lucivy_fts.
 //!
 //! Provides an n-gram (trigram) filter for substring search via n-gram index.
 
 use std::mem;
 
-use ld_tantivy::tokenizer::{Token, TokenFilter, TokenStream, Tokenizer};
+use ld_lucivy::tokenizer::{Token, TokenFilter, TokenStream, Tokenizer};
 
 /// Size of character-level n-grams to generate.
 const NGRAM_SIZE: usize = 3;
@@ -126,7 +126,7 @@ impl<T: TokenStream> TokenStream for NgramFilterStream<T> {
 
 #[cfg(test)]
 mod tests {
-    use ld_tantivy::tokenizer::{LowerCaser, SimpleTokenizer, TextAnalyzer, TokenStream};
+    use ld_lucivy::tokenizer::{LowerCaser, SimpleTokenizer, TextAnalyzer, TokenStream};
 
     use super::NgramFilter;
 

@@ -11,7 +11,7 @@
 // - If none of a/b/c are included, emit a neutral filler token to keep doc length similar
 //
 // Notes:
-// - After optimization, when scoring is disabled Tantivy reads doc-only postings
+// - After optimization, when scoring is disabled Lucivy reads doc-only postings
 //   (IndexRecordOption::Basic), avoiding frequency decoding overhead.
 // - This bench isolates boolean iteration speed and intersection/union cost.
 // - Use `cargo bench --bench boolean_conjunction` to run.
@@ -20,11 +20,11 @@ use binggan::{black_box, BenchGroup, BenchRunner};
 use rand::prelude::*;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
-use tantivy::collector::sort_key::SortByStaticFastValue;
-use tantivy::collector::{Collector, Count, TopDocs};
-use tantivy::query::{Query, QueryParser};
-use tantivy::schema::{Schema, FAST, TEXT};
-use tantivy::{doc, Index, Order, ReloadPolicy, Searcher};
+use lucivy::collector::sort_key::SortByStaticFastValue;
+use lucivy::collector::{Collector, Count, TopDocs};
+use lucivy::query::{Query, QueryParser};
+use lucivy::schema::{Schema, FAST, TEXT};
+use lucivy::{doc, Index, Order, ReloadPolicy, Searcher};
 
 #[derive(Clone)]
 struct BenchIndex {

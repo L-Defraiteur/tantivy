@@ -27,7 +27,7 @@ use crate::aggregation::intermediate_agg_result::{
 use crate::aggregation::segment_agg_result::{BucketIdProvider, SegmentAggregationCollector};
 use crate::aggregation::{format_date, BucketId, Key};
 use crate::error::DataCorruption;
-use crate::TantivyError;
+use crate::LucivyError;
 
 /// Contains all information required by the SegmentTermCollector to perform the
 /// terms aggregation on a segment.
@@ -347,7 +347,7 @@ pub(crate) fn build_segment_term_collector(
     let column_type = terms_req_data.column_type;
 
     if column_type == ColumnType::Bytes {
-        return Err(TantivyError::InvalidArgument(format!(
+        return Err(LucivyError::InvalidArgument(format!(
             "terms aggregation is not supported for column type {column_type:?}"
         )));
     }
@@ -359,7 +359,7 @@ pub(crate) fn build_segment_term_collector(
 
             node.get_sub_agg(agg_name, &req_data.per_request)
                 .ok_or_else(|| {
-                    TantivyError::InvalidArgument(format!(
+                    LucivyError::InvalidArgument(format!(
                         "could not find aggregation with name {agg_name} in metric \
                          sub_aggregations"
                     ))
@@ -1071,7 +1071,7 @@ where
                 .clone()
                 .downcast_arc::<CompactSpaceU64Accessor>()
                 .map_err(|_| {
-                    TantivyError::AggregationError(
+                    LucivyError::AggregationError(
                         crate::aggregation::AggregationError::InternalError(
                             "Type mismatch: Could not downcast to CompactSpaceU64Accessor"
                                 .to_string(),

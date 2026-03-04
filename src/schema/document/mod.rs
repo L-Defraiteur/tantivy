@@ -1,18 +1,18 @@
-//! Document definition for Tantivy to index and store.
+//! Document definition for Lucivy to index and store.
 //!
 //! A document and its values are defined by a couple core traits:
 //! - [Document] which describes your top-level document and it's fields.
-//! - [Value] which provides tantivy with a way to access the document's values in a common way
+//! - [Value] which provides lucivy with a way to access the document's values in a common way
 //!   without performing any additional allocations.
 //! - [DocumentDeserialize] which implements the necessary code to deserialize the document from the
-//!   doc store. If you are fine with fetching [TantivyDocument] from the doc store, you can skip
+//!   doc store. If you are fine with fetching [LucivyDocument] from the doc store, you can skip
 //!   implementing this trait for your type.
 //!
-//! Tantivy provides a few out-of-box implementations of these core traits to provide
+//! Lucivy provides a few out-of-box implementations of these core traits to provide
 //! some simple usage if you don't want to implement these traits on a custom type yourself.
 //!
 //! # Out-of-box document implementations
-//! - [TantivyDocument] the old document type used by Tantivy before the trait based approach was
+//! - [LucivyDocument] the old document type used by Lucivy before the trait based approach was
 //!   implemented. This type is still valid and provides all of the original behaviour you might
 //!   expect.
 //! - `BTreeMap<Field, OwnedValue>` a mapping of field_ids to their relevant schema value using a
@@ -22,7 +22,7 @@
 //!
 //! # Implementing your custom documents
 //! Often in larger projects or higher performance applications you want to avoid the extra overhead
-//! of converting your own types to the [TantivyDocument] type, this can often save you a
+//! of converting your own types to the [LucivyDocument] type, this can often save you a
 //! significant amount of time when indexing by avoiding the additional allocations.
 //!
 //! ### Important Note
@@ -37,19 +37,19 @@
 //! ## A basic custom document
 //! ```
 //! use std::collections::{btree_map, BTreeMap};
-//! use tantivy::schema::{Document, Field};
-//! use tantivy::schema::document::{DeserializeError, DocumentDeserialize, DocumentDeserializer};
+//! use lucivy::schema::{Document, Field};
+//! use lucivy::schema::document::{DeserializeError, DocumentDeserialize, DocumentDeserializer};
 //!
 //! /// Our custom document to let us use a map of `serde_json::Values`.
 //! #[allow(dead_code)]
 //! pub struct MyCustomDocument {
-//!     // Tantivy provides trait implementations for common `serde_json` types.
+//!     // Lucivy provides trait implementations for common `serde_json` types.
 //!     fields: BTreeMap<Field, serde_json::Value>
 //! }
 //!
 //! impl Document for MyCustomDocument {
 //!     // The value type produced by the `iter_fields_and_values` iterator.
-//!     // tantivy already implements the Value trait for serde_json::Value.
+//!     // lucivy already implements the Value trait for serde_json::Value.
 //!     type Value<'a> = &'a serde_json::Value;
 //!     // The iterator which is produced by `iter_fields_and_values`.
 //!     // Often this is a simple new-type wrapper unless you like super long generics.
@@ -95,14 +95,14 @@
 //! ```
 //!
 //! You may have noticed in this example that we haven't needed to implement any custom value types,
-//! instead we've just used a [serde_json::Value] type which tantivy provides an existing
+//! instead we've just used a [serde_json::Value] type which lucivy provides an existing
 //! implementation for.
 //!
 //! ## Implementing custom values
 //! In order to allow documents to return custom types, they must implement
-//! the [Value] trait which provides a way for Tantivy to get a `ReferenceValue` that it can then
+//! the [Value] trait which provides a way for Lucivy to get a `ReferenceValue` that it can then
 //! index and store.
-//! Internally, Tantivy only works with `ReferenceValue` which is an enum that tries to borrow
+//! Internally, Lucivy only works with `ReferenceValue` which is an enum that tries to borrow
 //! as much data as it can
 //!
 //! Values can just as easily be customised as documents by implementing the `Value` trait.
@@ -112,18 +112,18 @@
 //! on to the [ReferenceValue].
 //!
 //! This is why [Value] is implemented for `&'a serde_json::Value` and
-//! [&'a tantivy::schema::document::OwnedValue](OwnedValue) but not for their owned counterparts, as
+//! [&'a lucivy::schema::document::OwnedValue](OwnedValue) but not for their owned counterparts, as
 //! we cannot satisfy the lifetime bounds necessary when indexing the documents.
 //!
 //! ### A note about returning values
 //! The custom value type does not have to be the type stored by the document, instead the
 //! implementer of a `Value` can just be used as a way to convert between the owned type
-//! kept in the parent document, and the value passed into Tantivy.
+//! kept in the parent document, and the value passed into Lucivy.
 //!
 //! ```
-//! use tantivy::schema::document::ReferenceValue;
-//! use tantivy::schema::document::ReferenceValueLeaf;
-//! use tantivy::schema::{Value};
+//! use lucivy::schema::document::ReferenceValue;
+//! use lucivy::schema::document::ReferenceValueLeaf;
+//! use lucivy::schema::{Value};
 //!
 //! #[derive(Debug)]
 //! /// Our custom value type which has 3 types, a string, float and bool.
@@ -144,9 +144,9 @@
 //!     type ArrayIter = std::iter::Empty<Self>;
 //!     type ObjectIter = std::iter::Empty<(&'a str, Self)>;
 //!
-//!     // The ReferenceValue which Tantivy can use.
+//!     // The ReferenceValue which Lucivy can use.
 //!     fn as_value(&self) -> ReferenceValue<'a, Self> {
-//!         // We can support any type that Tantivy itself supports.
+//!         // We can support any type that Lucivy itself supports.
 //!         match self {
 //!             MyCustomValue::String(val) => ReferenceValue::Leaf(ReferenceValueLeaf::Str(*val)),
 //!             MyCustomValue::Float(val) => ReferenceValue::Leaf(ReferenceValueLeaf::F64(*val)),
@@ -175,7 +175,7 @@ pub use self::de::{
     ValueDeserialize, ValueDeserializer, ValueType, ValueVisitor,
 };
 pub use self::default_document::{
-    CompactDocArrayIter, CompactDocObjectIter, CompactDocValue, DocParsingError, TantivyDocument,
+    CompactDocArrayIter, CompactDocObjectIter, CompactDocValue, DocParsingError, LucivyDocument,
 };
 pub use self::owned_value::OwnedValue;
 pub(crate) use self::se::BinaryDocumentSerializer;

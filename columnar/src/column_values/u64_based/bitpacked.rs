@@ -4,7 +4,7 @@ use std::ops::{Range, RangeInclusive};
 
 use common::{BinarySerializable, OwnedBytes};
 use fastdivide::DividerU64;
-use tantivy_bitpacker::{BitPacker, BitUnpacker, compute_num_bits};
+use lucivy_bitpacker::{BitPacker, BitUnpacker, compute_num_bits};
 
 use crate::column_values::u64_based::{ColumnCodec, ColumnCodecEstimator, ColumnStats};
 use crate::{ColumnValues, RowId};

@@ -1,4 +1,4 @@
-//! Definition of Tantivy's errors and results.
+//! Definition of Lucivy's errors and results.
 
 use std::path::PathBuf;
 use std::sync::{Arc, PoisonError};
@@ -16,7 +16,7 @@ use crate::{query, schema};
 
 /// Represents a `DataCorruption` error.
 ///
-/// When facing data corruption, tantivy actually panics or returns this error.
+/// When facing data corruption, lucivy actually panics or returns this error.
 #[derive(Clone)]
 pub struct DataCorruption {
     filepath: Option<PathBuf>,
@@ -54,7 +54,7 @@ impl fmt::Debug for DataCorruption {
 
 /// The library's error enum
 #[derive(Debug, Clone, Error)]
-pub enum TantivyError {
+pub enum LucivyError {
     /// Error when handling aggregations.
     #[error(transparent)]
     AggregationError(#[from] AggregationError),
@@ -100,7 +100,7 @@ pub enum TantivyError {
     /// System error. (e.g.: We failed spawning a new thread).
     #[error("System error.'{0}'")]
     SystemError(String),
-    /// Index incompatible with current version of Tantivy.
+    /// Index incompatible with current version of Lucivy.
     #[error("{0:?}")]
     IncompatibleIndex(Incompatibility),
     /// An internal error occurred. This is are internal states that should not be reached.
@@ -112,77 +112,77 @@ pub enum TantivyError {
     DeserializeError(DeserializeError),
 }
 
-impl From<io::Error> for TantivyError {
-    fn from(io_err: io::Error) -> TantivyError {
-        TantivyError::IoError(Arc::new(io_err))
+impl From<io::Error> for LucivyError {
+    fn from(io_err: io::Error) -> LucivyError {
+        LucivyError::IoError(Arc::new(io_err))
     }
 }
-impl From<DataCorruption> for TantivyError {
-    fn from(data_corruption: DataCorruption) -> TantivyError {
-        TantivyError::DataCorruption(data_corruption)
+impl From<DataCorruption> for LucivyError {
+    fn from(data_corruption: DataCorruption) -> LucivyError {
+        LucivyError::DataCorruption(data_corruption)
     }
 }
-impl From<FastFieldNotAvailableError> for TantivyError {
-    fn from(fastfield_error: FastFieldNotAvailableError) -> TantivyError {
-        TantivyError::SchemaError(format!("{fastfield_error}"))
+impl From<FastFieldNotAvailableError> for LucivyError {
+    fn from(fastfield_error: FastFieldNotAvailableError) -> LucivyError {
+        LucivyError::SchemaError(format!("{fastfield_error}"))
     }
 }
-impl From<LockError> for TantivyError {
-    fn from(lock_error: LockError) -> TantivyError {
-        TantivyError::LockFailure(lock_error, None)
-    }
-}
-
-impl From<query::QueryParserError> for TantivyError {
-    fn from(parsing_error: query::QueryParserError) -> TantivyError {
-        TantivyError::InvalidArgument(format!("Query is invalid. {parsing_error:?}"))
+impl From<LockError> for LucivyError {
+    fn from(lock_error: LockError) -> LucivyError {
+        LucivyError::LockFailure(lock_error, None)
     }
 }
 
-impl<Guard> From<PoisonError<Guard>> for TantivyError {
-    fn from(_: PoisonError<Guard>) -> TantivyError {
-        TantivyError::Poisoned
+impl From<query::QueryParserError> for LucivyError {
+    fn from(parsing_error: query::QueryParserError) -> LucivyError {
+        LucivyError::InvalidArgument(format!("Query is invalid. {parsing_error:?}"))
     }
 }
 
-impl From<time::error::Format> for TantivyError {
-    fn from(err: time::error::Format) -> TantivyError {
-        TantivyError::InvalidArgument(format!("Date formatting error: {err}"))
+impl<Guard> From<PoisonError<Guard>> for LucivyError {
+    fn from(_: PoisonError<Guard>) -> LucivyError {
+        LucivyError::Poisoned
     }
 }
 
-impl From<time::error::Parse> for TantivyError {
-    fn from(err: time::error::Parse) -> TantivyError {
-        TantivyError::InvalidArgument(format!("Date parsing error: {err}"))
+impl From<time::error::Format> for LucivyError {
+    fn from(err: time::error::Format) -> LucivyError {
+        LucivyError::InvalidArgument(format!("Date formatting error: {err}"))
     }
 }
 
-impl From<time::error::ComponentRange> for TantivyError {
-    fn from(err: time::error::ComponentRange) -> TantivyError {
-        TantivyError::InvalidArgument(format!("Date range error: {err}"))
+impl From<time::error::Parse> for LucivyError {
+    fn from(err: time::error::Parse) -> LucivyError {
+        LucivyError::InvalidArgument(format!("Date parsing error: {err}"))
     }
 }
 
-impl From<schema::DocParsingError> for TantivyError {
-    fn from(error: schema::DocParsingError) -> TantivyError {
-        TantivyError::InvalidArgument(format!("Failed to parse document {error:?}"))
+impl From<time::error::ComponentRange> for LucivyError {
+    fn from(err: time::error::ComponentRange) -> LucivyError {
+        LucivyError::InvalidArgument(format!("Date range error: {err}"))
     }
 }
 
-impl From<serde_json::Error> for TantivyError {
-    fn from(error: serde_json::Error) -> TantivyError {
-        TantivyError::IoError(Arc::new(error.into()))
+impl From<schema::DocParsingError> for LucivyError {
+    fn from(error: schema::DocParsingError) -> LucivyError {
+        LucivyError::InvalidArgument(format!("Failed to parse document {error:?}"))
     }
 }
 
-impl From<rayon::ThreadPoolBuildError> for TantivyError {
-    fn from(error: rayon::ThreadPoolBuildError) -> TantivyError {
-        TantivyError::SystemError(error.to_string())
+impl From<serde_json::Error> for LucivyError {
+    fn from(error: serde_json::Error) -> LucivyError {
+        LucivyError::IoError(Arc::new(error.into()))
     }
 }
 
-impl From<DeserializeError> for TantivyError {
-    fn from(error: DeserializeError) -> TantivyError {
-        TantivyError::DeserializeError(error)
+impl From<rayon::ThreadPoolBuildError> for LucivyError {
+    fn from(error: rayon::ThreadPoolBuildError) -> LucivyError {
+        LucivyError::SystemError(error.to_string())
+    }
+}
+
+impl From<DeserializeError> for LucivyError {
+    fn from(error: DeserializeError) -> LucivyError {
+        LucivyError::DeserializeError(error)
     }
 }

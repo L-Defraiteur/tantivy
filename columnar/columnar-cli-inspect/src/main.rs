@@ -2,10 +2,10 @@ use columnar::ColumnarReader;
 use common::file_slice::{FileSlice, WrapFile};
 use std::io;
 use std::path::Path;
-use tantivy::directory::footer::Footer;
+use lucivy::directory::footer::Footer;
 
 fn main() -> io::Result<()> {
-    println!("Opens a columnar file written by tantivy and validates it.");
+    println!("Opens a columnar file written by lucivy and validates it.");
     let path = std::env::args().nth(1).unwrap();
 
     let path = Path::new(&path);
@@ -43,7 +43,7 @@ pub fn validate_columnar_reader(reader: &ColumnarReader) {
     }
 }
 
-/// Opens a columnar file that was written by tantivy and validates it.
+/// Opens a columnar file that was written by lucivy and validates it.
 pub fn open_and_validate_columnar(path: &str) -> io::Result<ColumnarReader> {
     let wrap_file = WrapFile::new(std::fs::File::open(path)?)?;
     let slice = FileSlice::new(std::sync::Arc::new(wrap_file));

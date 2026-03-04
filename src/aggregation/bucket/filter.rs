@@ -18,7 +18,7 @@ use crate::docset::DocSet;
 use crate::query::{AllQuery, EnableScoring, Query, QueryParser};
 use crate::schema::Schema;
 use crate::tokenizer::TokenizerManager;
-use crate::{DocId, SegmentReader, TantivyError};
+use crate::{DocId, SegmentReader, LucivyError};
 
 /// A trait for query builders that can build queries programmatically.
 ///
@@ -45,11 +45,11 @@ use crate::{DocId, SegmentReader, TantivyError};
 /// # Example
 ///
 /// ```rust
-/// use tantivy::aggregation::bucket::QueryBuilder;
-/// use tantivy::query::{Query, TermQuery};
-/// use tantivy::schema::{Schema, IndexRecordOption};
-/// use tantivy::tokenizer::TokenizerManager;
-/// use tantivy::Term;
+/// use lucivy::aggregation::bucket::QueryBuilder;
+/// use lucivy::query::{Query, TermQuery};
+/// use lucivy::schema::{Schema, IndexRecordOption};
+/// use lucivy::tokenizer::TokenizerManager;
+/// use lucivy::Term;
 /// use serde::{Serialize, Deserialize};
 ///
 /// #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -64,7 +64,7 @@ use crate::{DocId, SegmentReader, TantivyError};
 ///         &self,
 ///         schema: &Schema,
 ///         _tokenizers: &TokenizerManager,
-///     ) -> tantivy::Result<Box<dyn Query>> {
+///     ) -> lucivy::Result<Box<dyn Query>> {
 ///         let field = schema.get_field(&self.field_name)?;
 ///         let term = Term::from_field_text(field, &self.term_text);
 ///         Ok(Box::new(TermQuery::new(term, IndexRecordOption::Basic)))
@@ -117,19 +117,19 @@ pub trait QueryBuilder: Debug + Send + Sync {
 ///
 /// ## Query String (Recommended)
 /// ```rust
-/// use tantivy::aggregation::bucket::FilterAggregation;
+/// use lucivy::aggregation::bucket::FilterAggregation;
 ///
-/// // Query strings are parsed using Tantivy's standard QueryParser
+/// // Query strings are parsed using Lucivy's standard QueryParser
 /// let filter_agg = FilterAggregation::new("category:electronics AND price:[100 TO 500]".to_string());
 /// ```
 ///
 /// ## Custom Query Builder
 /// ```rust
-/// use tantivy::aggregation::bucket::{FilterAggregation, QueryBuilder};
-/// use tantivy::query::{Query, TermQuery};
-/// use tantivy::schema::{Schema, IndexRecordOption};
-/// use tantivy::tokenizer::TokenizerManager;
-/// use tantivy::Term;
+/// use lucivy::aggregation::bucket::{FilterAggregation, QueryBuilder};
+/// use lucivy::query::{Query, TermQuery};
+/// use lucivy::schema::{Schema, IndexRecordOption};
+/// use lucivy::tokenizer::TokenizerManager;
+/// use lucivy::Term;
 /// use serde::{Serialize, Deserialize};
 ///
 /// #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -144,7 +144,7 @@ pub trait QueryBuilder: Debug + Send + Sync {
 ///         &self,
 ///         schema: &Schema,
 ///         _tokenizers: &TokenizerManager,
-///     ) -> tantivy::Result<Box<dyn Query>> {
+///     ) -> lucivy::Result<Box<dyn Query>> {
 ///         let field = schema.get_field(&self.field_name)?;
 ///         let term = Term::from_field_text(field, &self.term_text);
 ///         Ok(Box::new(TermQuery::new(term, IndexRecordOption::Basic)))
@@ -174,7 +174,7 @@ pub struct FilterAggregation {
 
 /// Represents different ways to specify a filter query
 pub enum FilterQuery {
-    /// Query string that will be parsed using Tantivy's standard parsing facilities
+    /// Query string that will be parsed using Lucivy's standard parsing facilities
     ///
     /// This is the recommended approach as it's serializable and doesn't carry runtime state.
     QueryString(String),
@@ -229,11 +229,11 @@ impl FilterAggregation {
     ///
     /// # Example
     /// ```rust
-    /// use tantivy::aggregation::bucket::{FilterAggregation, QueryBuilder};
-    /// use tantivy::query::{Query, TermQuery};
-    /// use tantivy::schema::{Schema, IndexRecordOption};
-    /// use tantivy::tokenizer::TokenizerManager;
-    /// use tantivy::Term;
+    /// use lucivy::aggregation::bucket::{FilterAggregation, QueryBuilder};
+    /// use lucivy::query::{Query, TermQuery};
+    /// use lucivy::schema::{Schema, IndexRecordOption};
+    /// use lucivy::tokenizer::TokenizerManager;
+    /// use lucivy::Term;
     /// use serde::{Serialize, Deserialize};
     ///
     /// #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -248,7 +248,7 @@ impl FilterAggregation {
     ///         &self,
     ///         schema: &Schema,
     ///         _tokenizers: &TokenizerManager,
-    ///     ) -> tantivy::Result<Box<dyn Query>> {
+    ///     ) -> lucivy::Result<Box<dyn Query>> {
     ///         let field = schema.get_field(&self.field_name)?;
     ///         let term = Term::from_field_text(field, &self.term_text);
     ///         Ok(Box::new(TermQuery::new(term, IndexRecordOption::Basic)))
@@ -271,7 +271,7 @@ impl FilterAggregation {
         }
     }
 
-    /// Parse the query into a Tantivy Query object
+    /// Parse the query into a Lucivy Query object
     ///
     /// For query strings, this uses the QueryParser::parse_query() method.
     /// For custom builders, builds the query using the builder.
@@ -287,7 +287,7 @@ impl FilterAggregation {
 
                 query_parser
                     .parse_query(query_str)
-                    .map_err(|e| TantivyError::InvalidArgument(e.to_string()))
+                    .map_err(|e| LucivyError::InvalidArgument(e.to_string()))
             }
             FilterQuery::CustomBuilder(builder) => {
                 // Build the query using the builder
@@ -310,8 +310,8 @@ impl FilterAggregation {
         match &self.query {
             FilterQuery::QueryString(query_str) => query_parser
                 .parse_query(query_str)
-                .map_err(|e| TantivyError::InvalidArgument(e.to_string())),
-            FilterQuery::CustomBuilder(_) => Err(TantivyError::InvalidArgument(
+                .map_err(|e| LucivyError::InvalidArgument(e.to_string())),
+            FilterQuery::CustomBuilder(_) => Err(LucivyError::InvalidArgument(
                 "parse_query_with_parser is not supported for custom query builders. Use \
                  parse_query with explicit schema and tokenizers instead."
                     .to_string(),
@@ -999,7 +999,7 @@ mod tests {
 
         let expected = json!({
             "premium_electronics": {
-                "doc_count": 1,  // Only apple (999) is >= 800 in tantivy's range semantics
+                "doc_count": 1,  // Only apple (999) is >= 800 in lucivy's range semantics
                 "avg_rating": { "value": 4.5 }
             }
         });
@@ -1434,7 +1434,7 @@ mod tests {
         });
 
         let result = serde_json::from_value::<Aggregations>(agg)
-            .map_err(|e| crate::TantivyError::InvalidArgument(e.to_string()))
+            .map_err(|e| crate::LucivyError::InvalidArgument(e.to_string()))
             .and_then(|aggregations| {
                 let collector = create_collector(&index, aggregations)?;
                 searcher.search(&AllQuery, &collector)

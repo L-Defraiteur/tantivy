@@ -22,7 +22,7 @@ mod build_compact_space;
 
 use build_compact_space::get_compact_space;
 use common::{BinarySerializable, CountingWriter, OwnedBytes, VInt, VIntU128};
-use tantivy_bitpacker::{BitPacker, BitUnpacker};
+use lucivy_bitpacker::{BitPacker, BitUnpacker};
 
 use crate::RowId;
 use crate::column_values::ColumnValues;
@@ -196,7 +196,7 @@ impl CompactSpaceCompressor {
             "case unsupported."
         );
 
-        let num_bits = tantivy_bitpacker::compute_num_bits(amplitude_compact_space as u64);
+        let num_bits = lucivy_bitpacker::compute_num_bits(amplitude_compact_space as u64);
 
         assert_eq!(
             compact_space

@@ -8,5 +8,5 @@ fn main() {
         build.flag("-sDISABLE_EXCEPTION_CATCHING=0");
     }
 
-    build.compile("tantivy_fts_cxx");
+    build.compile("lucivy_fts_cxx");
 }

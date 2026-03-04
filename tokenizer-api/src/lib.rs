@@ -1,9 +1,9 @@
 //! Tokenizer are in charge of chopping text into a stream of tokens
-//! ready for indexing. This is an separate crate from tantivy, so implementers don't need to update
-//! for each new tantivy version.
+//! ready for indexing. This is an separate crate from lucivy, so implementers don't need to update
+//! for each new lucivy version.
 //!
 //! To add support for a tokenizer, implement the [`Tokenizer`] trait.
-//! Checkout the [tantivy repo](https://github.com/quickwit-oss/tantivy/tree/main/src/tokenizer) for some examples.
+//! Checkout the [lucivy repo](https://github.com/quickwit-oss/tantivy/tree/main/src/tokenizer) for some examples.
 
 use std::borrow::{Borrow, BorrowMut};
 use std::ops::{Deref, DerefMut};

@@ -204,14 +204,14 @@ mod tests {
             let explanation_err = term_query.explain(&searcher, DocAddress::new(0u32, 0u32));
             assert!(matches!(
                 explanation_err,
-                Err(crate::TantivyError::InvalidArgument(_msg))
+                Err(crate::LucivyError::InvalidArgument(_msg))
             ));
         }
         {
             let explanation_err = term_query.explain(&searcher, DocAddress::new(0u32, 3u32));
             assert!(matches!(
                 explanation_err,
-                Err(crate::TantivyError::InvalidArgument(_msg))
+                Err(crate::LucivyError::InvalidArgument(_msg))
             ));
         }
         Ok(())
@@ -440,7 +440,7 @@ mod tests {
         // Using TopDocs requires scoring; since the field is not indexed,
         // TermQuery cannot score and should return a SchemaError.
         let res = searcher.search(&tq, &TopDocs::with_limit(1).order_by_score());
-        assert!(matches!(res, Err(crate::TantivyError::SchemaError(_))));
+        assert!(matches!(res, Err(crate::LucivyError::SchemaError(_))));
 
         Ok(())
     }

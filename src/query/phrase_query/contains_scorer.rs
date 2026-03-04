@@ -11,7 +11,7 @@ use crate::query::{BitSetDocSet, Intersection, Scorer};
 use crate::schema::document::Value;
 use crate::schema::Field;
 use crate::store::StoreReader;
-use crate::{DocId, Score, TantivyDocument};
+use crate::{DocId, Score, LucivyDocument};
 
 /// ContainsScorer: multi-token scorer with separator validation.
 ///
@@ -216,7 +216,7 @@ impl<TPostings: Postings> ContainsScorer<TPostings> {
 
         // Load stored text
         let doc_id = self.intersection_docset.doc();
-        let doc: TantivyDocument = self.store_reader.get(doc_id).ok()?;
+        let doc: LucivyDocument = self.store_reader.get(doc_id).ok()?;
         let stored_text = doc.get_first(self.field)?.as_str()?.to_string();
 
         // Fallback: tokenize if no offsets in index
@@ -489,7 +489,7 @@ impl ContainsSingleScorer {
         if doc_id == TERMINATED {
             return false;
         }
-        let doc: TantivyDocument = match self.store_reader.get(doc_id) {
+        let doc: LucivyDocument = match self.store_reader.get(doc_id) {
             Ok(d) => d,
             Err(_) => return false,
         };

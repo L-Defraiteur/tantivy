@@ -34,13 +34,13 @@ use crate::{DocId, Score};
 /// # Example
 ///
 /// ```rust
-/// use tantivy::collector::Count;
-/// use tantivy::query::RangeQuery;
-/// use tantivy::Term;
-/// use tantivy::schema::{Schema, INDEXED};
-/// use tantivy::{doc, Index, IndexWriter};
+/// use lucivy::collector::Count;
+/// use lucivy::query::RangeQuery;
+/// use lucivy::Term;
+/// use lucivy::schema::{Schema, INDEXED};
+/// use lucivy::{doc, Index, IndexWriter};
 /// use std::ops::Bound;
-/// # fn test() -> tantivy::Result<()> {
+/// # fn test() -> lucivy::Result<()> {
 /// let mut schema_builder = Schema::builder();
 /// let year_field = schema_builder.add_u64_field("year", INDEXED);
 /// let schema = schema_builder.build();
@@ -109,7 +109,7 @@ impl Query for RangeQuery {
             Ok(Box::new(FastFieldRangeWeight::new(self.bounds.clone())))
         } else {
             if field_type.is_json() {
-                return Err(crate::TantivyError::InvalidArgument(
+                return Err(crate::LucivyError::InvalidArgument(
                     "RangeQuery on JSON is only supported for fast fields currently".to_string(),
                 ));
             }
@@ -270,7 +270,7 @@ mod tests {
     use crate::query::range_query::range_query::InvertedIndexRangeQuery;
     use crate::query::{AllScorer, ConstScorer, EmptyScorer, EnableScoring, Query, QueryParser};
     use crate::schema::{
-        Field, IntoIpv6Addr, Schema, TantivyDocument, FAST, INDEXED, STORED, TEXT,
+        Field, IntoIpv6Addr, Schema, LucivyDocument, FAST, INDEXED, STORED, TEXT,
     };
     use crate::{Index, IndexWriter, Term};
 
@@ -355,7 +355,7 @@ mod tests {
             index_writer.set_merge_policy(Box::new(NoMergePolicy));
 
             for i in 1..100 {
-                let mut doc = TantivyDocument::new();
+                let mut doc = LucivyDocument::new();
                 for j in 1..100 {
                     if i % j == 0 {
                         doc.add_i64(int_field, j as i64);
@@ -420,7 +420,7 @@ mod tests {
             let mut index_writer = index.writer_with_num_threads(1, 60_000_000).unwrap();
             let mut docs = Vec::new();
             for i in 1..100 {
-                let mut doc = TantivyDocument::new();
+                let mut doc = LucivyDocument::new();
                 for j in 1..100 {
                     if i % j == 0 {
                         doc.add_f64(float_field, j as f64);

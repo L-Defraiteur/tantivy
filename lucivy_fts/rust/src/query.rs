@@ -10,15 +10,15 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use ld_tantivy::query::{
+use ld_lucivy::query::{
     AllQuery, AutomatonPhraseQuery, BooleanQuery, FuzzyParams, FuzzyTermQuery, HighlightSink,
     NgramContainsQuery, Occur, PhraseQuery, Query, QueryParser, RangeQuery, RegexParams,
     RegexQuery, TermQuery, VerificationMode,
 };
 use regex::Regex;
 use regex_syntax::hir::literal::Extractor;
-use ld_tantivy::schema::{Field, FieldType, IndexRecordOption, Schema, Term};
-use ld_tantivy::Index;
+use ld_lucivy::schema::{Field, FieldType, IndexRecordOption, Schema, Term};
+use ld_lucivy::Index;
 
 // ─── Schema Config ──────────────────────────────────────────────────────────
 
@@ -762,7 +762,7 @@ fn build_filter_clause(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ld_tantivy::schema::{INDEXED, STORED, STRING};
+    use ld_lucivy::schema::{INDEXED, STORED, STRING};
     use serde_json::json;
 
     // ─── regex_escape ───────────────────────────────────────────────────

@@ -165,7 +165,7 @@ impl SortKeyComputer for SortByErasedType {
                         })
                     }
                     column_type => {
-                        return Err(crate::TantivyError::SchemaError(format!(
+                        return Err(crate::LucivyError::SchemaError(format!(
                             "Field `{}` is of type {column_type:?}, which is not supported for \
                              sorting by owned value yet.",
                             column_name

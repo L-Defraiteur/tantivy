@@ -1,19 +1,19 @@
 // # Iterating docs and positions.
 //
-// At its core of tantivy, relies on a data structure
+// At its core of lucivy, relies on a data structure
 // called an inverted index.
 //
 // This example shows how to manually iterate through
 // the list of documents containing a term, getting
 // its term frequency, and accessing its positions.
 
-use tantivy::postings::Postings;
+use lucivy::postings::Postings;
 // ---
-// Importing tantivy...
-use tantivy::schema::*;
-use tantivy::{doc, DocSet, Index, IndexWriter, TERMINATED};
+// Importing lucivy...
+use lucivy::schema::*;
+use lucivy::{doc, DocSet, Index, IndexWriter, TERMINATED};
 
-fn main() -> tantivy::Result<()> {
+fn main() -> lucivy::Result<()> {
     // We first create a schema for the sake of the
     // example. Check the `basic_search` example for more information.
     let mut schema_builder = Schema::builder();
@@ -35,7 +35,7 @@ fn main() -> tantivy::Result<()> {
 
     let searcher = reader.searcher();
 
-    // A tantivy index is actually a collection of segments.
+    // A lucivy index is actually a collection of segments.
     // Similarly, a searcher just wraps a list `segment_reader`.
     //
     // (Because we indexed a very small number of documents over one thread
@@ -53,7 +53,7 @@ fn main() -> tantivy::Result<()> {
         let term_the = Term::from_field_text(title, "the");
 
         // This segment posting object is like a cursor over the documents matching the term.
-        // The `IndexRecordOption` arguments tells tantivy we will be interested in both term
+        // The `IndexRecordOption` arguments tells lucivy we will be interested in both term
         // frequencies and positions.
         //
         // If you don't need all this information, you may get better performance by decompressing
@@ -97,8 +97,8 @@ fn main() -> tantivy::Result<()> {
 
     // Some other powerful operations (especially `.skip_to`) may be useful to consume these
     // posting lists rapidly.
-    // You can check for them in the [`DocSet`](https://docs.rs/tantivy/~0/tantivy/trait.DocSet.html) trait
-    // and the [`Postings`](https://docs.rs/tantivy/~0/tantivy/trait.Postings.html) trait
+    // You can check for them in the [`DocSet`](https://docs.rs/tantivy/~0/lucivy/trait.DocSet.html) trait
+    // and the [`Postings`](https://docs.rs/tantivy/~0/lucivy/trait.Postings.html) trait
 
     // Also, for some VERY specific high performance use case like an OLAP analysis of logs,
     // you can get better performance by accessing directly the blocks of doc ids.
@@ -110,7 +110,7 @@ fn main() -> tantivy::Result<()> {
         let inverted_index = segment_reader.inverted_index(title)?;
 
         // This segment posting object is like a cursor over the documents matching the term.
-        // The `IndexRecordOption` arguments tells tantivy we will be interested in both term
+        // The `IndexRecordOption` arguments tells lucivy we will be interested in both term
         // frequencies and positions.
         //
         // If you don't need all this information, you may get better performance by decompressing

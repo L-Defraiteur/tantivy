@@ -7,7 +7,7 @@ use tokenizer_api::Token;
 use crate::schema::document::{Document, ReferenceValue, ReferenceValueLeaf, Value};
 use crate::schema::{value_type_to_column_type, Field, FieldType, Schema, Type};
 use crate::tokenizer::{TextAnalyzer, TokenizerManager};
-use crate::{DocId, TantivyError};
+use crate::{DocId, LucivyError};
 
 /// Only index JSON down to a depth of 20.
 /// This is mostly to guard us from a stack overflow triggered by malicious input.
@@ -59,7 +59,7 @@ impl FastFieldsWriter {
             if let FieldType::JsonObject(json_object_options) = field_entry.field_type() {
                 if let Some(tokenizer_name) = json_object_options.get_fast_field_tokenizer_name() {
                     let text_analyzer = tokenizer_manager.get(tokenizer_name).ok_or_else(|| {
-                        TantivyError::InvalidArgument(format!(
+                        LucivyError::InvalidArgument(format!(
                             "Tokenizer {tokenizer_name:?} not found"
                         ))
                     })?;
@@ -72,7 +72,7 @@ impl FastFieldsWriter {
             if let FieldType::Str(text_options) = field_entry.field_type() {
                 if let Some(tokenizer_name) = text_options.get_fast_field_tokenizer_name() {
                     let text_analyzer = tokenizer_manager.get(tokenizer_name).ok_or_else(|| {
-                        TantivyError::InvalidArgument(format!(
+                        LucivyError::InvalidArgument(format!(
                             "Tokenizer {tokenizer_name:?} not found"
                         ))
                     })?;

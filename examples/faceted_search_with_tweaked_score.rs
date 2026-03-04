@@ -1,7 +1,7 @@
 // # Faceted Search With Tweak Score
 //
 // This example covers the faceted search functionalities of
-// tantivy.
+// lucivy.
 //
 // We will :
 // - define a text field "name" in our schema
@@ -9,12 +9,12 @@
 
 use std::collections::HashSet;
 
-use tantivy::collector::TopDocs;
-use tantivy::query::BooleanQuery;
-use tantivy::schema::*;
-use tantivy::{doc, DocId, Index, IndexWriter, Score, SegmentReader};
+use lucivy::collector::TopDocs;
+use lucivy::query::BooleanQuery;
+use lucivy::schema::*;
+use lucivy::{doc, DocId, Index, IndexWriter, Score, SegmentReader};
 
-fn main() -> tantivy::Result<()> {
+fn main() -> lucivy::Result<()> {
     let mut schema_builder = Schema::builder();
 
     let title = schema_builder.add_text_field("title", STORED);
@@ -91,7 +91,7 @@ fn main() -> tantivy::Result<()> {
             .iter()
             .map(|(_, doc_id)| {
                 searcher
-                    .doc::<TantivyDocument>(*doc_id)
+                    .doc::<LucivyDocument>(*doc_id)
                     .unwrap()
                     .get_first(title)
                     .and_then(|v| v.as_str().map(|el| el.to_string()))

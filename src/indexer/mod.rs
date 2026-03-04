@@ -171,13 +171,13 @@ mod tests_mmap {
 
     #[test]
     fn test_json_field_1byte() {
-        // Test when field name contains a '1' byte, which has special meaning in tantivy.
+        // Test when field name contains a '1' byte, which has special meaning in lucivy.
         // The 1 byte can be addressed as '1' byte or '.'.
         let field_name_in = "\u{0001}";
         let field_name_out = "\u{0001}";
         test_json_field_name(field_name_in, field_name_out);
 
-        // Test when field name contains a '1' byte, which has special meaning in tantivy.
+        // Test when field name contains a '1' byte, which has special meaning in lucivy.
         let field_name_in = "\u{0001}";
         let field_name_out = ".";
         test_json_field_name(field_name_in, field_name_out);
@@ -277,7 +277,7 @@ mod tests_mmap {
         );
         test_agg(format!("json.{field_name_out}a").as_str(), "test7");
 
-        // `.` is stored as `\u{0001}` internally in tantivy
+        // `.` is stored as `\u{0001}` internally in lucivy
         let field_name_out_internal = if field_name_out == "." {
             "\u{0001}"
         } else {

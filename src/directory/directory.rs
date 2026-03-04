@@ -98,7 +98,7 @@ fn retry_policy(is_blocking: bool) -> RetryPolicy {
 }
 
 /// Write-once read many (WORM) abstraction for where
-/// tantivy's data should be stored.
+/// lucivy's data should be stored.
 ///
 /// There are currently two implementations of `Directory`
 ///
@@ -219,7 +219,7 @@ pub trait Directory: DirectoryClone + fmt::Debug + Send + Sync + 'static {
     /// It does not override previous callbacks. When the file is modified, all callback that are
     /// registered (and whose [`WatchHandle`] is still alive) are triggered.
     ///
-    /// Internally, tantivy only uses this API to detect new commits to implement the
+    /// Internally, lucivy only uses this API to detect new commits to implement the
     /// `OnCommitWithDelay` `ReloadPolicy`. Not implementing watch in a `Directory` only prevents
     /// the `OnCommitWithDelay` `ReloadPolicy` to work properly.
     fn watch(&self, watch_callback: WatchCallback) -> crate::Result<WatchHandle>;

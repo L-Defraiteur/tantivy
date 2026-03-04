@@ -63,7 +63,7 @@ pub enum Type {
     Bool = b'o',
     /// `date(i64) timestamp`
     Date = b'd',
-    /// `tantivy::schema::Facet`. Passed as a string in JSON.
+    /// `lucivy::schema::Facet`. Passed as a string in JSON.
     Facet = b'h',
     /// `Vec<u8>`
     Bytes = b'b',
@@ -163,7 +163,7 @@ impl Type {
 }
 
 /// A `FieldType` describes the type (text, u64) of a field as well as
-/// how it should be handled by tantivy.
+/// how it should be handled by lucivy.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", content = "options")]
 #[serde(rename_all = "snake_case")]
@@ -353,7 +353,7 @@ impl FieldType {
 
     /// Parses a field value from json, given the target FieldType.
     ///
-    /// Tantivy will try to cast values only with the coerce option.
+    /// Lucivy will try to cast values only with the coerce option.
     /// For instance, If the json value is the integer `3` and the
     /// target field is a `Str`, this method will return an Error if `coerce`
     /// is not enabled.
@@ -581,27 +581,27 @@ mod tests {
     };
     use crate::time::{Date, Month, PrimitiveDateTime, Time};
     use crate::tokenizer::{PreTokenizedString, Token};
-    use crate::{DateTime, TantivyDocument};
+    use crate::{DateTime, LucivyDocument};
 
     #[test]
     fn test_to_string_coercion() {
         let mut schema_builder = Schema::builder();
         let text_field = schema_builder.add_text_field("id", COERCE);
         let schema = schema_builder.build();
-        let doc = TantivyDocument::parse_json(&schema, r#"{"id": 100}"#).unwrap();
+        let doc = LucivyDocument::parse_json(&schema, r#"{"id": 100}"#).unwrap();
         assert_eq!(
             OwnedValue::Str("100".to_string()),
             doc.get_first(text_field).unwrap().into()
         );
 
-        let doc = TantivyDocument::parse_json(&schema, r#"{"id": true}"#).unwrap();
+        let doc = LucivyDocument::parse_json(&schema, r#"{"id": true}"#).unwrap();
         assert_eq!(
             OwnedValue::Str("true".to_string()),
             doc.get_first(text_field).unwrap().into()
         );
 
         // Not sure if this null coercion is the best approach
-        let doc = TantivyDocument::parse_json(&schema, r#"{"id": null}"#).unwrap();
+        let doc = LucivyDocument::parse_json(&schema, r#"{"id": null}"#).unwrap();
         assert_eq!(
             OwnedValue::Str("null".to_string()),
             doc.get_first(text_field).unwrap().into()
@@ -616,7 +616,7 @@ mod tests {
         let f64_field = schema_builder.add_f64_field("f64", COERCE);
         let schema = schema_builder.build();
         let doc_json = r#"{"i64": "100", "u64": "100", "f64": "100"}"#;
-        let doc = TantivyDocument::parse_json(&schema, doc_json).unwrap();
+        let doc = LucivyDocument::parse_json(&schema, doc_json).unwrap();
         assert_eq!(
             OwnedValue::I64(100),
             doc.get_first(i64_field).unwrap().into()
@@ -637,14 +637,14 @@ mod tests {
         let bool_field = schema_builder.add_bool_field("bool", COERCE);
         let schema = schema_builder.build();
         let doc_json = r#"{"bool": "true"}"#;
-        let doc = TantivyDocument::parse_json(&schema, doc_json).unwrap();
+        let doc = LucivyDocument::parse_json(&schema, doc_json).unwrap();
         assert_eq!(
             OwnedValue::Bool(true),
             doc.get_first(bool_field).unwrap().into()
         );
 
         let doc_json = r#"{"bool": "false"}"#;
-        let doc = TantivyDocument::parse_json(&schema, doc_json).unwrap();
+        let doc = LucivyDocument::parse_json(&schema, doc_json).unwrap();
         assert_eq!(
             OwnedValue::Bool(false),
             doc.get_first(bool_field).unwrap().into()
@@ -658,17 +658,17 @@ mod tests {
         schema_builder.add_u64_field("u64", NumericOptions::default());
         schema_builder.add_f64_field("f64", NumericOptions::default());
         let schema = schema_builder.build();
-        assert!(TantivyDocument::parse_json(&schema, r#"{"u64": "100"}"#)
+        assert!(LucivyDocument::parse_json(&schema, r#"{"u64": "100"}"#)
             .unwrap_err()
             .to_string()
             .contains("a u64"));
 
-        assert!(TantivyDocument::parse_json(&schema, r#"{"i64": "100"}"#)
+        assert!(LucivyDocument::parse_json(&schema, r#"{"i64": "100"}"#)
             .unwrap_err()
             .to_string()
             .contains("a i64"));
 
-        assert!(TantivyDocument::parse_json(&schema, r#"{"f64": "100"}"#)
+        assert!(LucivyDocument::parse_json(&schema, r#"{"f64": "100"}"#)
             .unwrap_err()
             .to_string()
             .contains("a f64"));
@@ -680,7 +680,7 @@ mod tests {
         let date_field = schema_builder.add_date_field("date", INDEXED);
         let schema = schema_builder.build();
         let doc_json = r#"{"date": "2019-10-12T07:20:50.52+02:00"}"#;
-        let doc = TantivyDocument::parse_json(&schema, doc_json).unwrap();
+        let doc = LucivyDocument::parse_json(&schema, doc_json).unwrap();
         let date = OwnedValue::from(doc.get_first(date_field).unwrap());
         // Time zone is converted to UTC
         assert_eq!("Date(2019-10-12T05:20:50.52Z)", format!("{date:?}"));
@@ -688,7 +688,7 @@ mod tests {
 
     #[test]
     fn test_serialize_json_date() {
-        let mut doc = TantivyDocument::new();
+        let mut doc = LucivyDocument::new();
         let mut schema_builder = Schema::builder();
         let date_field = schema_builder.add_date_field("date", INDEXED);
         let schema = schema_builder.build();

@@ -361,7 +361,7 @@ pub(crate) fn build_segment_agg_collector(
         AggKind::MissingTerm => {
             let req_data = &mut req.per_request.missing_term_req_data[node.idx_in_req_data];
             if req_data.accessors.is_empty() {
-                return Err(crate::TantivyError::InternalError(
+                return Err(crate::LucivyError::InternalError(
                     "MissingTerm aggregation requires at least one field accessor.".to_string(),
                 ));
             }
@@ -619,7 +619,7 @@ fn build_nodes(
                 Sum(_) => StatsType::Sum,
                 Count(_) => StatsType::Count,
                 _ => {
-                    return Err(crate::TantivyError::InvalidArgument(
+                    return Err(crate::LucivyError::InvalidArgument(
                         "Internal error: unexpected aggregation type in metric aggregation \
                          handling."
                             .to_string(),
@@ -855,7 +855,7 @@ fn build_terms_or_cardinality_nodes(
             .collect::<Vec<_>>();
         // This case only happens when we have term aggregation, or we fail
         let req = req.as_terms().cloned().ok_or_else(|| {
-            crate::TantivyError::InvalidArgument(
+            crate::LucivyError::InvalidArgument(
                 "Cardinality aggregation with missing on non-text/number field is not supported."
                     .to_string(),
             )
@@ -972,7 +972,7 @@ fn for_each_matching_term_ord(
     match param {
         IncludeExcludeParam::Regex(pattern) => {
             let re = Regex::new(pattern).map_err(|e| {
-                crate::TantivyError::InvalidArgument(format!("Invalid regex `{}`: {}", pattern, e))
+                crate::LucivyError::InvalidArgument(format!("Invalid regex `{}`: {}", pattern, e))
             })?;
             // TODO: we can handle patterns like `^prefix.*` more efficiently
             let mut stream = str_col.dictionary().search(re).into_stream()?;

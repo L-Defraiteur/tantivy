@@ -13,7 +13,7 @@ use crate::directory::error::OpenReadError;
 #[cfg(feature = "mmap")]
 use crate::directory::MmapDirectory;
 use crate::directory::{Directory, ManagedDirectory, RamDirectory, INDEX_WRITER_LOCK};
-use crate::error::{DataCorruption, TantivyError};
+use crate::error::{DataCorruption, LucivyError};
 use crate::index::{IndexMeta, SegmentId, SegmentMeta, SegmentMetaInventory};
 use crate::indexer::index_writer::{
     IndexWriterOptions, MAX_NUM_THREAD, MEMORY_BUDGET_NUM_BYTES_MIN,
@@ -67,7 +67,7 @@ async fn load_metas_async(
 /// - it fails, in which case an error is returned, and the `meta.json` remains untouched,
 /// - it succeeds, and `meta.json` is written and flushed.
 ///
-/// This method is not part of tantivy's public API
+/// This method is not part of lucivy's public API
 fn save_new_metas(
     schema: Schema,
     index_settings: IndexSettings,
@@ -95,8 +95,8 @@ fn save_new_metas(
 /// # Examples
 ///
 /// ```
-/// use tantivy::schema::*;
-/// use tantivy::{Index, IndexSettings};
+/// use lucivy::schema::*;
+/// use lucivy::{Index, IndexSettings};
 ///
 /// let mut schema_builder = Schema::builder();
 /// let id_field = schema_builder.add_text_field("id", STRING);
@@ -167,7 +167,7 @@ impl IndexBuilder {
     /// The index will be allocated in anonymous memory.
     /// This is useful for indexing small set of documents
     /// for instances like unit test or temporary in memory index.
-    pub fn create_in_ram(self) -> Result<Index, TantivyError> {
+    pub fn create_in_ram(self) -> Result<Index, LucivyError> {
         let ram_directory = RamDirectory::create();
         self.create(ram_directory)
     }
@@ -176,12 +176,12 @@ impl IndexBuilder {
     /// The index will use the [`MmapDirectory`].
     ///
     /// If a previous index was in this directory, it returns an
-    /// [`TantivyError::IndexAlreadyExists`] error.
+    /// [`LucivyError::IndexAlreadyExists`] error.
     #[cfg(feature = "mmap")]
     pub fn create_in_dir<P: AsRef<Path>>(self, directory_path: P) -> crate::Result<Index> {
         let mmap_directory: Box<dyn Directory> = Box::new(MmapDirectory::open(directory_path)?);
         if Index::exists(&*mmap_directory)? {
-            return Err(TantivyError::IndexAlreadyExists);
+            return Err(LucivyError::IndexAlreadyExists);
         }
         self.create(mmap_directory)
     }
@@ -224,7 +224,7 @@ impl IndexBuilder {
         self.schema
             .as_ref()
             .cloned()
-            .ok_or(TantivyError::IndexBuilderMissingArgument("schema"))
+            .ok_or(LucivyError::IndexBuilderMissingArgument("schema"))
     }
 
     /// Opens or creates a new index in the provided directory
@@ -238,7 +238,7 @@ impl IndexBuilder {
         if index.schema() == self.get_expect_schema()? {
             Ok(index)
         } else {
-            Err(TantivyError::SchemaError(
+            Err(LucivyError::SchemaError(
                 "An index exists but the schema does not match.".to_string(),
             ))
         }
@@ -248,7 +248,7 @@ impl IndexBuilder {
         if let Some(_schema) = self.schema.as_ref() {
             Ok(())
         } else {
-            Err(TantivyError::InvalidArgument(
+            Err(LucivyError::InvalidArgument(
                 "no schema passed".to_string(),
             ))
         }
@@ -312,7 +312,7 @@ impl Index {
     /// Replace the default single thread search executor pool
     /// by a thread pool with a given number of threads.
     pub fn set_multithread_executor(&mut self, num_threads: usize) -> crate::Result<()> {
-        self.executor = Executor::multi_thread(num_threads, "tantivy-search-")?;
+        self.executor = Executor::multi_thread(num_threads, "lucivy-search-")?;
         Ok(())
     }
 
@@ -341,7 +341,7 @@ impl Index {
     /// The index will use the [`MmapDirectory`].
     ///
     /// If a previous index was in this directory, then it returns
-    /// a [`TantivyError::IndexAlreadyExists`] error.
+    /// a [`LucivyError::IndexAlreadyExists`] error.
     #[cfg(feature = "mmap")]
     pub fn create_in_dir<P: AsRef<Path>>(
         directory_path: P,
@@ -436,14 +436,14 @@ impl Index {
             FieldType::JsonObject(options) => options.get_text_indexing_options(),
             FieldType::Str(options) => options.get_indexing_options(),
             _ => {
-                return Err(TantivyError::SchemaError(format!(
+                return Err(LucivyError::SchemaError(format!(
                     "{:?} is not a text field.",
                     field_entry.name()
                 )))
             }
         };
         let indexing_options = indexing_options_opt.ok_or_else(|| {
-            TantivyError::InvalidArgument(format!(
+            LucivyError::InvalidArgument(format!(
                 "No indexing options set for field {field_entry:?}"
             ))
         })?;
@@ -451,7 +451,7 @@ impl Index {
         tokenizer_manager
             .get(indexing_options.tokenizer())
             .ok_or_else(|| {
-                TantivyError::InvalidArgument(format!(
+                LucivyError::InvalidArgument(format!(
                     "No Tokenizer found for field {field_entry:?}"
                 ))
             })
@@ -563,9 +563,9 @@ impl Index {
     ///   indexer threads, etc...
     ///
     /// # Errors
-    /// If the lockfile already exists, returns `TantivyError::LockFailure`.
+    /// If the lockfile already exists, returns `LucivyError::LockFailure`.
     /// If the memory arena per thread is too small or too big, returns
-    /// `TantivyError::InvalidArgument`
+    /// `LucivyError::InvalidArgument`
     pub fn writer_with_options<D: Document>(
         &self,
         options: IndexWriterOptions,
@@ -574,7 +574,7 @@ impl Index {
             .directory
             .acquire_lock(&INDEX_WRITER_LOCK)
             .map_err(|err| {
-                TantivyError::LockFailure(
+                LucivyError::LockFailure(
                     err,
                     Some(
                         "Failed to acquire index lock. If you are using a regular directory, this \
@@ -606,7 +606,7 @@ impl Index {
     /// # Errors
     /// If the lockfile already exists, returns `Error::DirectoryLockBusy` or an `Error::IoError`.
     /// If the memory arena per thread is too small or too big, returns
-    /// `TantivyError::InvalidArgument`
+    /// `LucivyError::InvalidArgument`
     pub fn writer_with_num_threads<D: Document>(
         &self,
         num_threads: usize,
@@ -631,7 +631,7 @@ impl Index {
 
     /// Creates a multithreaded writer
     ///
-    /// Tantivy will automatically define the number of threads to use, but
+    /// Lucivy will automatically define the number of threads to use, but
     /// no more than 8 threads.
     /// `overall_memory_arena_in_bytes` is the total target memory usage that will be split
     /// between a given number of threads.
@@ -639,7 +639,7 @@ impl Index {
     /// # Errors
     /// If the lockfile already exists, returns `Error::FileAlreadyExists`.
     /// If the memory arena per thread is too small or too big, returns
-    /// `TantivyError::InvalidArgument`
+    /// `LucivyError::InvalidArgument`
     pub fn writer<D: Document>(
         &self,
         memory_budget_in_bytes: usize,

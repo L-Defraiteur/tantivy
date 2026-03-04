@@ -7,7 +7,7 @@ use tantivy_fst::Automaton;
 use crate::query::phrase_query::scoring_utils::HighlightSink;
 use crate::query::{AutomatonWeight, EnableScoring, Query, Weight};
 use crate::schema::{Term, Type};
-use crate::TantivyError::InvalidArgument;
+use crate::LucivyError::InvalidArgument;
 
 pub(crate) struct DfaWrapper(pub DFA);
 
@@ -38,12 +38,12 @@ impl Automaton for DfaWrapper {
 /// containing a specific term that is within
 /// Levenshtein distance
 /// ```rust
-/// use tantivy::collector::{Count, TopDocs};
-/// use tantivy::query::FuzzyTermQuery;
-/// use tantivy::schema::{Schema, TEXT};
-/// use tantivy::{doc, Index, IndexWriter, Term};
+/// use lucivy::collector::{Count, TopDocs};
+/// use lucivy::query::FuzzyTermQuery;
+/// use lucivy::schema::{Schema, TEXT};
+/// use lucivy::{doc, Index, IndexWriter, Term};
 ///
-/// fn example() -> tantivy::Result<()> {
+/// fn example() -> lucivy::Result<()> {
 ///     let mut schema_builder = Schema::builder();
 ///     let title = schema_builder.add_text_field("title", TEXT);
 ///     let schema = schema_builder.build();
@@ -217,7 +217,7 @@ mod test {
     use crate::indexer::NoMergePolicy;
     use crate::query::QueryParser;
     use crate::schema::{Schema, STORED, TEXT};
-    use crate::{assert_nearly_equals, Index, IndexWriter, TantivyDocument, Term};
+    use crate::{assert_nearly_equals, Index, IndexWriter, LucivyDocument, Term};
 
     #[test]
     pub fn test_fuzzy_json_path() -> crate::Result<()> {
@@ -231,7 +231,7 @@ mod test {
 
         let mut index_writer = index.writer_for_tests()?;
         index_writer.set_merge_policy(Box::new(NoMergePolicy));
-        let doc = TantivyDocument::parse_json(
+        let doc = LucivyDocument::parse_json(
             &schema,
             r#"{
             "attributes": {
@@ -240,7 +240,7 @@ mod test {
         }"#,
         )?;
         index_writer.add_document(doc)?;
-        let doc = TantivyDocument::parse_json(
+        let doc = LucivyDocument::parse_json(
             &schema,
             r#"{
             "attributes": {

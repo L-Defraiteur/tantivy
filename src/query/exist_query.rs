@@ -11,7 +11,7 @@ use crate::query::boost_query::BoostScorer;
 use crate::query::explanation::does_not_match;
 use crate::query::{BitSetDocSet, EnableScoring, Explanation, Query, Scorer, Weight};
 use crate::schema::Type;
-use crate::{DocId, Score, TantivyError};
+use crate::{DocId, Score, LucivyError};
 
 /// Query that matches all documents with a non-null value in the specified
 /// field.
@@ -73,11 +73,11 @@ impl Query for ExistsQuery {
     fn weight(&self, enable_scoring: EnableScoring) -> crate::Result<Box<dyn Weight>> {
         let schema = enable_scoring.schema();
         let Some((field, _path)) = schema.find_field(&self.field_name) else {
-            return Err(TantivyError::FieldNotFound(self.field_name.clone()));
+            return Err(LucivyError::FieldNotFound(self.field_name.clone()));
         };
         let field_type = schema.get_field_entry(field).field_type();
         if !field_type.is_fast() {
-            return Err(TantivyError::SchemaError(format!(
+            return Err(LucivyError::SchemaError(format!(
                 "Field {} is not a fast field.",
                 self.field_name
             )));

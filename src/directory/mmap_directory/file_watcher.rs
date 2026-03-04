@@ -41,7 +41,7 @@ impl FileWatcher {
         let state = self.state.clone();
 
         thread::Builder::new()
-            .name("thread-tantivy-meta-file-watcher".to_string())
+            .name("thread-lucivy-meta-file-watcher".to_string())
             .spawn(move || {
                 let mut current_checksum_opt = None;
 

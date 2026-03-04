@@ -41,7 +41,7 @@ impl TermSetQuery {
             let field_type = field_entry.field_type();
             if !field_type.is_indexed() {
                 let error_msg = format!("Field {:?} is not indexed.", field_entry.name());
-                return Err(crate::TantivyError::SchemaError(error_msg));
+                return Err(crate::LucivyError::SchemaError(error_msg));
             }
 
             // In practice this won't fail because:

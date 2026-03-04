@@ -1,8 +1,8 @@
-//! Schema definition for tantivy's indices.
+//! Schema definition for lucivy's indices.
 //!
-//! # Setting your schema in Tantivy
+//! # Setting your schema in Lucivy
 //!
-//! Tantivy has a very strict schema.
+//! Lucivy has a very strict schema.
 //! The schema defines information about the fields your index contains, that is, for each field:
 //!
 //! - the field name (may contain any character, can't start with a `-` and can't be empty. Some
@@ -14,7 +14,7 @@
 //! This very last point is critical as it will enable / disable some of the functionality
 //! for your index.
 //!
-//! Tantivy's schema is stored within the `meta.json` file at the root of your
+//! Lucivy's schema is stored within the `meta.json` file at the root of your
 //! directory.
 //!
 //!
@@ -27,7 +27,7 @@
 //! ### Example
 //!
 //! ```
-//! use tantivy::schema::*;
+//! use lucivy::schema::*;
 //! let mut schema_builder = Schema::builder();
 //! let title_options = TextOptions::default()
 //!     .set_stored()
@@ -58,7 +58,7 @@
 //! ### Example
 //!
 //! ```
-//! use tantivy::schema::*;
+//! use lucivy::schema::*;
 //! let mut schema_builder = Schema::builder();
 //! let num_stars_options = NumericOptions::default()
 //!     .set_stored()
@@ -84,7 +84,7 @@
 //! rewritten:
 //!
 //! ```
-//! use tantivy::schema::*;
+//! use lucivy::schema::*;
 //! let mut schema_builder = Schema::builder();
 //! schema_builder.add_u64_field("num_stars", INDEXED | STORED);
 //! schema_builder.add_text_field("title", TEXT | STORED);
@@ -103,7 +103,7 @@
 //! generally much slower than searching in an index.
 //!
 //! ```
-//! use tantivy::schema::*;
+//! use lucivy::schema::*;
 //! let mut schema_builder = Schema::builder();
 //! schema_builder.add_u64_field("population", STORED | FAST);
 //! schema_builder.add_text_field("zip_code", STRING | FAST);
@@ -134,7 +134,7 @@ use columnar::ColumnType;
 
 pub use self::bytes_options::BytesOptions;
 pub use self::date_time_options::{DateOptions, DateTimePrecision, DATE_TIME_PRECISION_INDEXED};
-pub use self::document::{DocParsingError, Document, OwnedValue, TantivyDocument, Value};
+pub use self::document::{DocParsingError, Document, OwnedValue, LucivyDocument, Value};
 pub(crate) use self::facet::FACET_SEP_BYTE;
 pub use self::facet::{Facet, FacetParseError};
 pub use self::facet_options::FacetOptions;

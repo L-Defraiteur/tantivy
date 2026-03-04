@@ -14,8 +14,8 @@ pub use self::searcher::{Searcher, SearcherGeneration};
 /// of the index.
 pub static META_FILEPATH: Lazy<&'static Path> = Lazy::new(|| Path::new("meta.json"));
 
-/// The managed file contains a list of files that were created by the tantivy
-/// and will therefore be garbage collected when they are deemed useless by tantivy.
+/// The managed file contains a list of files that were created by the lucivy
+/// and will therefore be garbage collected when they are deemed useless by lucivy.
 ///
 /// Removing this file is safe, but will prevent the garbage collection of all of the file that
 /// are currently in the directory

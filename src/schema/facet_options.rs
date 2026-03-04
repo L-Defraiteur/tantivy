@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::schema::flags::{IndexedFlag, SchemaFlagList, StoredFlag};
 
-/// Define how a facet field should be handled by tantivy.
+/// Define how a facet field should be handled by lucivy.
 ///
 /// Note that a Facet is always indexed and stored as a fastfield.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -22,7 +22,7 @@ impl FacetOptions {
     /// Set the field as stored.
     ///
     /// Only the fields that are set as *stored* are
-    /// persisted into the Tantivy's store.
+    /// persisted into the Lucivy's store.
     #[must_use]
     pub fn set_stored(mut self) -> FacetOptions {
         self.stored = true;

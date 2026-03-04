@@ -1,6 +1,6 @@
-//! `tantivy_sstable` is a crate that provides a sorted string table data structure.
+//! `lucivy_sstable` is a crate that provides a sorted string table data structure.
 //!
-//! It is used in `tantivy` to store the term dictionary.
+//! It is used in `lucivy` to store the term dictionary.
 //!
 //! A `sstable` is a map of sorted `&[u8]` keys to values.
 //! The keys are encoded using incremental encoding.
@@ -13,7 +13,7 @@
 //!
 //! ```rust
 //! use common::OwnedBytes;
-//! use tantivy_sstable::{Dictionary, MonotonicU64SSTable};
+//! use lucivy_sstable::{Dictionary, MonotonicU64SSTable};
 //!
 //! // Create a new sstable in memory.
 //! let mut builder = Dictionary::<MonotonicU64SSTable>::builder(Vec::new()).unwrap();

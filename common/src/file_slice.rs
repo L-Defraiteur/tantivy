@@ -9,7 +9,7 @@ use ownedbytes::{OwnedBytes, StableDeref};
 
 use crate::{ByteCount, HasLen};
 
-/// Objects that represents files sections in tantivy.
+/// Objects that represents files sections in lucivy.
 ///
 /// By contract, whatever happens to the directory file, as long as a FileHandle
 /// is alive, the data associated with it cannot be altered or destroyed.
@@ -110,7 +110,7 @@ where B: StableDeref + Deref<Target = [u8]> + 'static + Send + Sync
     }
 }
 
-/// Logical slice of read only file in tantivy.
+/// Logical slice of read only file in lucivy.
 ///
 /// It can be cloned and sliced cheaply.
 #[derive(Clone)]

@@ -73,12 +73,12 @@ fn facet_depth(facet_bytes: &[u8]) -> usize {
 ///
 ///
 /// ```rust
-/// use tantivy::collector::FacetCollector;
-/// use tantivy::query::AllQuery;
-/// use tantivy::schema::{Facet, Schema, FacetOptions, TEXT};
-/// use tantivy::{doc, Index};
+/// use lucivy::collector::FacetCollector;
+/// use lucivy::query::AllQuery;
+/// use lucivy::schema::{Facet, Schema, FacetOptions, TEXT};
+/// use lucivy::{doc, Index};
 ///
-/// fn example() -> tantivy::Result<()> {
+/// fn example() -> lucivy::Result<()> {
 ///     let mut schema_builder = Schema::builder();
 ///
 ///     // Facet have their own specific type.
@@ -495,7 +495,7 @@ mod tests {
     use crate::collector::Count;
     use crate::index::Index;
     use crate::query::{AllQuery, QueryParser, TermQuery};
-    use crate::schema::{Facet, FacetOptions, IndexRecordOption, Schema, TantivyDocument};
+    use crate::schema::{Facet, FacetOptions, IndexRecordOption, Schema, LucivyDocument};
     use crate::{IndexWriter, Term};
 
     fn test_collapse_mapping_aux(
@@ -601,7 +601,7 @@ mod tests {
             })
             .collect();
         for i in 0..num_facets * 10 {
-            let mut doc = TantivyDocument::new();
+            let mut doc = LucivyDocument::new();
             doc.add_facet(facet_field, facets[i % num_facets].clone());
             index_writer.add_document(doc).unwrap();
         }
@@ -732,7 +732,7 @@ mod tests {
         let index = Index::create_in_ram(schema);
 
         let uniform = Uniform::new_inclusive(1, 100_000);
-        let mut docs: Vec<TantivyDocument> =
+        let mut docs: Vec<LucivyDocument> =
             vec![("a", 10), ("b", 100), ("c", 7), ("d", 12), ("e", 21)]
                 .into_iter()
                 .flat_map(|(c, count)| {
@@ -781,7 +781,7 @@ mod tests {
         let schema = schema_builder.build();
         let index = Index::create_in_ram(schema);
 
-        let docs: Vec<TantivyDocument> = vec![("b", 2), ("a", 2), ("c", 4)]
+        let docs: Vec<LucivyDocument> = vec![("b", 2), ("a", 2), ("c", 4)]
             .into_iter()
             .flat_map(|(c, count)| {
                 let facet = Facet::from(&format!("/facet/{c}"));

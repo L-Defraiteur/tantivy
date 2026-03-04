@@ -16,7 +16,7 @@ use crate::query::{
     AllScorer, ConstScorer, EmptyScorer, EnableScoring, Explanation, Query, Scorer, Weight,
 };
 use crate::schema::{Type, ValueBytes};
-use crate::{DocId, DocSet, Score, SegmentReader, TantivyError, Term};
+use crate::{DocId, DocSet, Score, SegmentReader, LucivyError, Term};
 
 #[derive(Clone, Debug)]
 /// `FastFieldRangeQuery` is the same as [RangeQuery] but only uses the fast field
@@ -129,7 +129,7 @@ impl Weight for FastFieldRangeWeight {
                     )
                 }
                 Type::Bool | Type::Facet | Type::Bytes | Type::Json | Type::IpAddr => {
-                    Err(crate::TantivyError::InvalidArgument(format!(
+                    Err(crate::LucivyError::InvalidArgument(format!(
                         "unsupported value bytes type in json term value_bytes {:?}",
                         term_value.typ()
                     )))
@@ -138,7 +138,7 @@ impl Weight for FastFieldRangeWeight {
         } else if field_type.is_ip_addr() {
             let parse_ip_from_bytes = |term: &Term| {
                 term.value().as_ip_addr().ok_or_else(|| {
-                    crate::TantivyError::InvalidArgument("Expected ip address".to_string())
+                    crate::LucivyError::InvalidArgument("Expected ip address".to_string())
                 })
             };
             let bounds: BoundsRange<Ipv6Addr> = self.bounds.map_bound_res(parse_ip_from_bytes)?;
@@ -191,7 +191,7 @@ impl Weight for FastFieldRangeWeight {
                 } else if let Some(val) = value.as_date() {
                     val.to_u64()
                 } else {
-                    return Err(TantivyError::InvalidArgument(format!(
+                    return Err(LucivyError::InvalidArgument(format!(
                         "Expected term with u64, i64, f64 or date, but got {term:?}"
                     )));
                 };
@@ -222,7 +222,7 @@ impl Weight for FastFieldRangeWeight {
     fn explain(&self, reader: &SegmentReader, doc: DocId) -> crate::Result<Explanation> {
         let mut scorer = self.scorer(reader, 1.0)?;
         if scorer.seek(doc) != doc {
-            return Err(TantivyError::InvalidArgument(format!(
+            return Err(LucivyError::InvalidArgument(format!(
                 "Document #({doc}) does not match"
             )));
         }
@@ -504,7 +504,7 @@ mod tests {
         DateOptions, Field, NumericOptions, Schema, SchemaBuilder, FAST, INDEXED, STORED, STRING,
         TEXT,
     };
-    use crate::{Index, IndexWriter, TantivyDocument, Term, TERMINATED};
+    use crate::{Index, IndexWriter, LucivyDocument, Term, TERMINATED};
 
     #[test]
     fn test_text_field_ff_range_query() -> crate::Result<()> {
@@ -704,14 +704,14 @@ mod tests {
                 "id_u64": 0,
                 "id_i64": 50,
             });
-            let doc = TantivyDocument::parse_json(&schema, &serde_json::to_string(&doc).unwrap())
+            let doc = LucivyDocument::parse_json(&schema, &serde_json::to_string(&doc).unwrap())
                 .unwrap();
             index_writer.add_document(doc).unwrap();
             let doc = json!({
                 "id_u64": 10,
                 "id_i64": 1000,
             });
-            let doc = TantivyDocument::parse_json(&schema, &serde_json::to_string(&doc).unwrap())
+            let doc = LucivyDocument::parse_json(&schema, &serde_json::to_string(&doc).unwrap())
                 .unwrap();
             index_writer.add_document(doc).unwrap();
 

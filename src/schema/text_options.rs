@@ -7,7 +7,7 @@ use super::flags::{CoerceFlag, FastFlag};
 use crate::schema::flags::{SchemaFlagList, StoredFlag};
 use crate::schema::IndexRecordOption;
 
-/// Define how a text field should be handled by tantivy.
+/// Define how a text field should be handled by lucivy.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub struct TextOptions {
     #[serde(default)]

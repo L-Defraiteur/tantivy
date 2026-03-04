@@ -1,9 +1,9 @@
 [package]
-name = "ld-tantivy-tokenizer-api"
+name = "ld-lucivy-tokenizer-api"
 version = "0.26.0"
 license = "MIT"
 edition = "2024"
-description = "Tokenizer API of tantivy"
+description = "Tokenizer API of lucivy"
 homepage = "https://github.com/quickwit-oss/tantivy"
 repository = "https://github.com/quickwit-oss/tantivy"
 

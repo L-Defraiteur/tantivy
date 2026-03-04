@@ -14,7 +14,7 @@ use crate::aggregation::intermediate_agg_result::{
 };
 use crate::aggregation::segment_agg_result::SegmentAggregationCollector;
 use crate::aggregation::*;
-use crate::TantivyError;
+use crate::LucivyError;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct BuildSaltedHasher {
@@ -287,7 +287,7 @@ impl SegmentAggregationCollector for SegmentCardinalityCollector {
                 .clone()
                 .downcast_arc::<CompactSpaceU64Accessor>()
                 .map_err(|_| {
-                    TantivyError::AggregationError(
+                    LucivyError::AggregationError(
                         crate::aggregation::AggregationError::InternalError(
                             "Type mismatch: Could not downcast to CompactSpaceU64Accessor"
                                 .to_string(),
@@ -352,7 +352,7 @@ impl CardinalityCollector {
 
     pub(crate) fn merge_fruits(&mut self, right: CardinalityCollector) -> crate::Result<()> {
         self.sketch.merge(&right.sketch).map_err(|err| {
-            TantivyError::AggregationError(AggregationError::InternalError(format!(
+            LucivyError::AggregationError(AggregationError::InternalError(format!(
                 "Error while merging cardinality {err:?}"
             )))
         })?;

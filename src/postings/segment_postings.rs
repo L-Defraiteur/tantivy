@@ -61,7 +61,7 @@ impl SegmentPostings {
     ///
     /// This method is mostly useful for unit tests.
     ///
-    /// It serializes the doc ids using tantivy's codec
+    /// It serializes the doc ids using lucivy's codec
     /// and returns a `SegmentPostings` object that embeds a
     /// buffer with the serialized data.
     #[cfg(test)]

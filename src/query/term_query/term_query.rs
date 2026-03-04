@@ -21,11 +21,11 @@ use crate::Term;
 /// * `field norm` - number of tokens in the field.
 ///
 /// ```rust
-/// use tantivy::collector::{Count, TopDocs};
-/// use tantivy::query::TermQuery;
-/// use tantivy::schema::{Schema, TEXT, IndexRecordOption};
-/// use tantivy::{doc, Index, IndexWriter, Term};
-/// # fn test() -> tantivy::Result<()> {
+/// use lucivy::collector::{Count, TopDocs};
+/// use lucivy::query::TermQuery;
+/// use lucivy::schema::{Schema, TEXT, IndexRecordOption};
+/// use lucivy::{doc, Index, IndexWriter, Term};
+/// # fn test() -> lucivy::Result<()> {
 /// let mut schema_builder = Schema::builder();
 /// let title = schema_builder.add_text_field("title", TEXT);
 /// let schema = schema_builder.build();
@@ -107,7 +107,7 @@ impl TermQuery {
         let field_entry = schema.get_field_entry(self.term.field());
         if !field_entry.is_indexed() {
             let error_msg = format!("Field {:?} is not indexed.", field_entry.name());
-            return Err(crate::TantivyError::SchemaError(error_msg));
+            return Err(crate::LucivyError::SchemaError(error_msg));
         }
         let bm25_weight = match enable_scoring {
             EnableScoring::Enabled {

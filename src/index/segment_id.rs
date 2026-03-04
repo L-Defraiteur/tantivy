@@ -12,7 +12,7 @@ use uuid::Uuid;
 
 /// Uuid identifying a segment.
 ///
-/// Tantivy's segment are identified
+/// Lucivy's segment are identified
 /// by a UUID which is used to prefix the filenames
 /// of all of the file associated with the segment.
 ///

@@ -1,7 +1,7 @@
 // # Stop Words Example
 //
 // This example covers the basic usage of stop words
-// with tantivy
+// with lucivy
 //
 // We will :
 // - define our schema
@@ -10,18 +10,18 @@
 // - index few documents in our index
 
 // ---
-// Importing tantivy...
-use tantivy::collector::TopDocs;
-use tantivy::query::QueryParser;
-use tantivy::schema::*;
-use tantivy::tokenizer::*;
-use tantivy::{doc, Index, IndexWriter};
+// Importing lucivy...
+use lucivy::collector::TopDocs;
+use lucivy::query::QueryParser;
+use lucivy::schema::*;
+use lucivy::tokenizer::*;
+use lucivy::{doc, Index, IndexWriter};
 
-fn main() -> tantivy::Result<()> {
+fn main() -> lucivy::Result<()> {
     // this example assumes you understand the content in `basic_search`
     let mut schema_builder = Schema::builder();
 
-    // This configures your custom options for how tantivy will
+    // This configures your custom options for how lucivy will
     // store and process your content in the index; The key
     // to note is that we are setting the tokenizer to `stoppy`
     // which will be defined and registered below.
@@ -105,7 +105,7 @@ fn main() -> tantivy::Result<()> {
     let top_docs = searcher.search(&query, &TopDocs::with_limit(10).order_by_score())?;
 
     for (score, doc_address) in top_docs {
-        let retrieved_doc: TantivyDocument = searcher.doc(doc_address)?;
+        let retrieved_doc: LucivyDocument = searcher.doc(doc_address)?;
         println!("\n==\nDocument score {score}:");
         println!("{}", retrieved_doc.to_json(&schema));
     }

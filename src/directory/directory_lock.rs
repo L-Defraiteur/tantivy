@@ -8,7 +8,7 @@ use once_cell::sync::Lazy;
 ///
 /// The lock will be passed to [`Directory::acquire_lock`](crate::Directory::acquire_lock).
 ///
-/// Tantivy itself uses only two locks but client application
+/// Lucivy itself uses only two locks but client application
 /// can use the directory facility to define their own locks.
 /// - [`INDEX_WRITER_LOCK`]
 /// - [`META_LOCK`]
@@ -32,18 +32,18 @@ pub struct Lock {
     pub is_blocking: bool,
 }
 
-/// Only one process should be able to write tantivy's index at a time.
+/// Only one process should be able to write lucivy's index at a time.
 /// This lock file, when present, is in charge of preventing other processes to open an
 /// `IndexWriter`.
 ///
 /// If the process is killed and this file remains, it is safe to remove it manually.
 ///
-/// Failing to acquire this lock usually means a misuse of tantivy's API,
+/// Failing to acquire this lock usually means a misuse of lucivy's API,
 /// (creating more than one instance of the `IndexWriter`), are a spurious
 /// lock file remaining after a crash. In the latter case, removing the file after
-/// checking no process running tantivy is running is safe.
+/// checking no process running lucivy is running is safe.
 pub static INDEX_WRITER_LOCK: Lazy<Lock> = Lazy::new(|| Lock {
-    filepath: PathBuf::from(".tantivy-writer.lock"),
+    filepath: PathBuf::from(".lucivy-writer.lock"),
     is_blocking: false,
 });
 /// The meta lock file is here to protect the segment files being opened by
@@ -55,6 +55,6 @@ pub static INDEX_WRITER_LOCK: Lazy<Lock> = Lazy::new(|| Lock {
 ///
 /// Opening segment readers is a very fast process.
 pub static META_LOCK: Lazy<Lock> = Lazy::new(|| Lock {
-    filepath: PathBuf::from(".tantivy-meta.lock"),
+    filepath: PathBuf::from(".lucivy-meta.lock"),
     is_blocking: true,
 });

@@ -18,7 +18,7 @@ use crate::aggregation::intermediate_agg_result::{
 };
 use crate::aggregation::segment_agg_result::{BucketIdProvider, SegmentAggregationCollector};
 use crate::aggregation::*;
-use crate::TantivyError;
+use crate::LucivyError;
 
 /// Contains all information required by the SegmentRangeCollector to perform the
 /// range aggregation on a segment.
@@ -447,14 +447,14 @@ fn to_u64_range(
 ) -> crate::Result<InternalRangeAggregationRange> {
     let start = if let Some(from) = range.from {
         f64_to_fastfield_u64(from, field_type)
-            .ok_or_else(|| TantivyError::InvalidArgument("invalid field type".to_string()))?
+            .ok_or_else(|| LucivyError::InvalidArgument("invalid field type".to_string()))?
     } else {
         u64::MIN
     };
 
     let end = if let Some(to) = range.to {
         f64_to_fastfield_u64(to, field_type)
-            .ok_or_else(|| TantivyError::InvalidArgument("invalid field type".to_string()))?
+            .ok_or_else(|| LucivyError::InvalidArgument("invalid field type".to_string()))?
     } else {
         u64::MAX
     };
@@ -490,7 +490,7 @@ fn extend_validate_ranges(
     let find_hole = |converted_buckets: &[InternalRangeAggregationRange]| {
         for (pos, ranges) in converted_buckets.windows(2).enumerate() {
             if ranges[0].range.end > ranges[1].range.start {
-                return Err(TantivyError::InvalidArgument(format!(
+                return Err(LucivyError::InvalidArgument(format!(
                     "Overlapping ranges not supported range {:?}, range+1 {:?}",
                     ranges[0], ranges[1]
                 )));

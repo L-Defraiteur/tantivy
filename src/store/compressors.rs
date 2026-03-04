@@ -42,7 +42,7 @@ impl<'de> Deserialize<'de> for Compressor {
             #[cfg(not(feature = "lz4-compression"))]
             "lz4" => {
                 return Err(serde::de::Error::custom(
-                    "unsupported variant `lz4`, please enable Tantivy's `lz4-compression` feature",
+                    "unsupported variant `lz4`, please enable Lucivy's `lz4-compression` feature",
                 ))
             }
             #[cfg(feature = "zstd-compression")]
@@ -52,7 +52,7 @@ impl<'de> Deserialize<'de> for Compressor {
             #[cfg(not(feature = "zstd-compression"))]
             _ if buf.starts_with("zstd") => {
                 return Err(serde::de::Error::custom(
-                    "unsupported variant `zstd`, please enable Tantivy's `zstd-compression` \
+                    "unsupported variant `zstd`, please enable Lucivy's `zstd-compression` \
                      feature",
                 ))
             }

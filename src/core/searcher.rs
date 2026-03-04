@@ -81,7 +81,7 @@ impl Searcher {
         self.inner.generation.as_ref()
     }
 
-    /// Fetches a document from tantivy's store given a [`DocAddress`].
+    /// Fetches a document from lucivy's store given a [`DocAddress`].
     ///
     /// The searcher uses the segment ordinal to route the
     /// request to the right `Segment`.

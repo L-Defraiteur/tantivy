@@ -12,7 +12,7 @@ use crate::query::phrase_query::scoring_utils::HighlightSink;
 use crate::query::{BitSetDocSet, ConstScorer, Explanation, Scorer, Weight};
 use crate::schema::{Field, IndexRecordOption};
 use crate::termdict::{TermDictionary, TermStreamer};
-use crate::{DocId, Score, TantivyError, TERMINATED};
+use crate::{DocId, Score, LucivyError, TERMINATED};
 
 /// A weight struct for Fuzzy Term and Regex Queries
 pub struct AutomatonWeight<A> {
@@ -159,7 +159,7 @@ where
         if scorer.seek(doc) == doc {
             Ok(Explanation::new("AutomatonScorer", 1.0))
         } else {
-            Err(TantivyError::InvalidArgument(
+            Err(LucivyError::InvalidArgument(
                 "Document does not exist".to_string(),
             ))
         }

@@ -5,15 +5,15 @@
 // tokens by some external tool.
 //
 // In this example we will:
-// - use tantivy tokenizer to create tokens and load them directly into tantivy,
+// - use lucivy tokenizer to create tokens and load them directly into lucivy,
 // - import tokenized text straight from json,
 // - perform a search on documents with pre-tokenized text
 
-use tantivy::collector::{Count, TopDocs};
-use tantivy::query::TermQuery;
-use tantivy::schema::*;
-use tantivy::tokenizer::{PreTokenizedString, SimpleTokenizer, Token, TokenStream, Tokenizer};
-use tantivy::{doc, Index, IndexWriter, ReloadPolicy};
+use lucivy::collector::{Count, TopDocs};
+use lucivy::query::TermQuery;
+use lucivy::schema::*;
+use lucivy::tokenizer::{PreTokenizedString, SimpleTokenizer, Token, TokenStream, Tokenizer};
+use lucivy::{doc, Index, IndexWriter, ReloadPolicy};
 use tempfile::TempDir;
 
 fn pre_tokenize_text(text: &str) -> Vec<Token> {
@@ -26,7 +26,7 @@ fn pre_tokenize_text(text: &str) -> Vec<Token> {
     tokens
 }
 
-fn main() -> tantivy::Result<()> {
+fn main() -> lucivy::Result<()> {
     let index_path = TempDir::new()?;
 
     let mut schema_builder = Schema::builder();
@@ -83,7 +83,7 @@ fn main() -> tantivy::Result<()> {
         }]
     }"#;
 
-    let short_man_doc = TantivyDocument::parse_json(&schema, short_man_json)?;
+    let short_man_doc = LucivyDocument::parse_json(&schema, short_man_json)?;
 
     index_writer.add_document(short_man_doc)?;
 
@@ -116,7 +116,7 @@ fn main() -> tantivy::Result<()> {
     // Note that the tokens are not stored along with the original text
     // in the document store
     for (_score, doc_address) in top_docs {
-        let retrieved_doc: TantivyDocument = searcher.doc(doc_address)?;
+        let retrieved_doc: LucivyDocument = searcher.doc(doc_address)?;
         println!("{}", retrieved_doc.to_json(&schema));
     }
 

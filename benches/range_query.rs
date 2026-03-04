@@ -7,10 +7,10 @@ use binggan::{black_box, BenchRunner, OutputValue, PeakMemAlloc, INSTRUMENTED_SY
 use columnar::MonotonicallyMappableToU128;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
-use tantivy::collector::{Count, TopDocs};
-use tantivy::query::QueryParser;
-use tantivy::schema::*;
-use tantivy::{doc, Index};
+use lucivy::collector::{Count, TopDocs};
+use lucivy::query::QueryParser;
+use lucivy::schema::*;
+use lucivy::{doc, Index};
 
 #[global_allocator]
 pub static GLOBAL: &PeakMemAlloc<std::alloc::System> = &INSTRUMENTED_SYSTEM;

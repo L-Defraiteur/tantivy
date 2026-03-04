@@ -3,12 +3,12 @@
 // This example shows how the ip field can be used
 // with IpV6 and IpV4.
 
-use tantivy::collector::{Count, TopDocs};
-use tantivy::query::QueryParser;
-use tantivy::schema::{Schema, FAST, INDEXED, STORED, STRING};
-use tantivy::{Index, IndexWriter, TantivyDocument};
+use lucivy::collector::{Count, TopDocs};
+use lucivy::query::QueryParser;
+use lucivy::schema::{Schema, FAST, INDEXED, STORED, STRING};
+use lucivy::{Index, IndexWriter, LucivyDocument};
 
-fn main() -> tantivy::Result<()> {
+fn main() -> lucivy::Result<()> {
     // # Defining the schema
     // We set the IP field as `INDEXED`, so it can be searched
     // `FAST` will create a fast field. The fast field will be used to execute search queries.
@@ -28,7 +28,7 @@ fn main() -> tantivy::Result<()> {
     // Adding documents that contain an IPv4 address. Notice that the IP addresses are passed as
     // `String`. Since the field is of type ip, we parse the IP address from the string and store it
     // internally as IPv6.
-    let doc = TantivyDocument::parse_json(
+    let doc = LucivyDocument::parse_json(
         &schema,
         r#"{
             "ip": "192.168.0.33",
@@ -36,7 +36,7 @@ fn main() -> tantivy::Result<()> {
         }"#,
     )?;
     index_writer.add_document(doc)?;
-    let doc = TantivyDocument::parse_json(
+    let doc = LucivyDocument::parse_json(
         &schema,
         r#"{
             "ip": "192.168.0.80",
@@ -46,7 +46,7 @@ fn main() -> tantivy::Result<()> {
     index_writer.add_document(doc)?;
     // ### IPv6
     // Adding a document that contains an IPv6 address.
-    let doc = TantivyDocument::parse_json(
+    let doc = LucivyDocument::parse_json(
         &schema,
         r#"{
             "ip": "2001:0db8:85a3:0000:0000:8a2e:0370:7334",

@@ -17,7 +17,7 @@ use crate::postings::{
 use crate::schema::document::{Document, Value};
 use crate::schema::{FieldEntry, FieldType, Schema, DATE_TIME_PRECISION_INDEXED};
 use crate::tokenizer::{FacetTokenizer, PreTokenizedStream, TextAnalyzer, Tokenizer};
-use crate::{DocId, Opstamp, TantivyError};
+use crate::{DocId, Opstamp, LucivyError};
 
 /// Computes the initial size of the hash table.
 ///
@@ -33,7 +33,7 @@ fn compute_initial_table_size(per_thread_memory_budget: usize) -> crate::Result<
         .take_while(|capacity| compute_table_memory_size(*capacity) < table_memory_upper_bound)
         .last()
         .ok_or_else(|| {
-            crate::TantivyError::InvalidArgument(format!(
+            crate::LucivyError::InvalidArgument(format!(
                 "per thread memory budget (={per_thread_memory_budget}) is too small. Raise the \
                  memory budget or lower the number of threads."
             ))
@@ -92,7 +92,7 @@ impl SegmentWriter {
                     .unwrap_or("default");
 
                 tokenizer_manager.get(tokenizer_name).ok_or_else(|| {
-                    TantivyError::SchemaError(format!(
+                    LucivyError::SchemaError(format!(
                         "Error getting tokenizer for field: {}",
                         field_entry.name()
                     ))
@@ -158,7 +158,7 @@ impl SegmentWriter {
 
             let field_entry = self.schema.get_field_entry(field);
             let make_schema_error = || {
-                TantivyError::SchemaError(format!(
+                LucivyError::SchemaError(format!(
                     "Expected a {:?} for field {:?}",
                     field_entry.field_type().value_type(),
                     field_entry.name()
@@ -364,7 +364,7 @@ impl SegmentWriter {
     /// - the number of documents in the segment assuming there is no deletes
     /// - the maximum document id (including deleted documents) + 1
     ///
-    /// Currently, **tantivy** does not handle deletes anyway,
+    /// Currently, **lucivy** does not handle deletes anyway,
     /// so `max_doc == num_docs`
     pub fn max_doc(&self) -> u32 {
         self.max_doc
@@ -373,7 +373,7 @@ impl SegmentWriter {
     /// Number of documents in the index.
     /// Deleted documents are not counted.
     ///
-    /// Currently, **tantivy** does not handle deletes anyway,
+    /// Currently, **lucivy** does not handle deletes anyway,
     /// so `max_doc == num_docs`
     #[allow(dead_code)]
     pub fn num_docs(&self) -> u32 {
@@ -440,7 +440,7 @@ mod tests {
     use crate::tokenizer::{PreTokenizedString, Token};
     use crate::{
         DateTime, Directory, DocAddress, DocSet, Index, IndexWriter, SegmentReader,
-        TantivyDocument, Term, TERMINATED,
+        LucivyDocument, Term, TERMINATED,
     };
 
     #[test]
@@ -459,7 +459,7 @@ mod tests {
         let mut schema_builder = Schema::builder();
         let text_field = schema_builder.add_text_field("title", TEXT | STORED);
         let schema = schema_builder.build();
-        let mut doc = TantivyDocument::default();
+        let mut doc = LucivyDocument::default();
         let pre_tokenized_text = PreTokenizedString {
             text: String::from("A"),
             tokens: vec![Token {
@@ -483,7 +483,7 @@ mod tests {
         store_writer.close().unwrap();
 
         let reader = StoreReader::open(directory.open_read(path).unwrap(), 0).unwrap();
-        let doc = reader.get::<TantivyDocument>(0).unwrap();
+        let doc = reader.get::<LucivyDocument>(0).unwrap();
 
         assert_eq!(doc.field_values().count(), 2);
         assert_eq!(
@@ -600,7 +600,7 @@ mod tests {
         let reader = index.reader().unwrap();
         let searcher = reader.searcher();
         let doc = searcher
-            .doc::<TantivyDocument>(DocAddress {
+            .doc::<LucivyDocument>(DocAddress {
                 segment_ord: 0u32,
                 doc_id: 0u32,
             })
@@ -733,7 +733,7 @@ mod tests {
         let mut schema_builder = Schema::builder();
         let json_field = schema_builder.add_json_field("json", STORED | TEXT);
         let schema = schema_builder.build();
-        let mut doc = TantivyDocument::default();
+        let mut doc = LucivyDocument::default();
         let json_val: BTreeMap<String, crate::schema::OwnedValue> =
             serde_json::from_str(r#"{"mykey": "repeated token token"}"#).unwrap();
         doc.add_object(json_field, json_val);
@@ -948,7 +948,7 @@ mod tests {
         let mut schema_builder = Schema::builder();
         let text = schema_builder.add_text_field("text", TEXT);
         let schema = schema_builder.build();
-        let doc = TantivyDocument::parse_json(&schema, r#"{"text": [ "bbb", "aaa", "", "aaa"]}"#)
+        let doc = LucivyDocument::parse_json(&schema, r#"{"text": [ "bbb", "aaa", "", "aaa"]}"#)
             .unwrap();
         let index = Index::create_in_ram(schema);
         let mut index_writer: IndexWriter = index.writer_for_tests().unwrap();
@@ -976,7 +976,7 @@ mod tests {
         let mut schema_builder = Schema::builder();
         let text = schema_builder.add_text_field("text", TEXT);
         let schema = schema_builder.build();
-        let mut doc = TantivyDocument::default();
+        let mut doc = LucivyDocument::default();
         // This is a bit of a contrived example.
         let tokens = PreTokenizedString {
             text: "roller-coaster".to_string(),
@@ -1014,7 +1014,7 @@ mod tests {
         let mut schema_builder = Schema::builder();
         let text = schema_builder.add_text_field("text", TEXT);
         let schema = schema_builder.build();
-        let mut doc = TantivyDocument::default();
+        let mut doc = LucivyDocument::default();
         // This is a bit of a contrived example.
         let tokens = PreTokenizedString {
             text: "contrived-example".to_string(), //< I can't think of a use case where this corner case happens in real life.
@@ -1072,7 +1072,7 @@ mod tests {
         let schema = index.schema();
         let mut index_writer = index.writer(50_000_000).unwrap();
         let title = schema.get_field("title").unwrap();
-        let mut document = TantivyDocument::default();
+        let mut document = LucivyDocument::default();
         document.add_text(title, "The Old Man and the Sea");
         index_writer.add_document(document).unwrap();
         let error = index_writer.commit().unwrap_err();

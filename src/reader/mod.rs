@@ -14,7 +14,7 @@ use crate::{Index, Inventory, Searcher, SegmentReader, TrackedObject};
 
 /// Defines when a new version of the index should be reloaded.
 ///
-/// Regardless of whether you search and index in the same process, tantivy does not necessarily
+/// Regardless of whether you search and index in the same process, lucivy does not necessarily
 /// reflects the change that are committed to your index. `ReloadPolicy` precisely helps you define
 /// when you want your index to be reloaded.
 #[derive(Clone, Copy)]
@@ -142,7 +142,7 @@ impl IndexReaderBuilder {
 }
 
 impl TryInto<IndexReader> for IndexReaderBuilder {
-    type Error = crate::TantivyError;
+    type Error = crate::LucivyError;
 
     fn try_into(self) -> crate::Result<IndexReader> {
         IndexReaderBuilder::try_into(self)

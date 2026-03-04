@@ -1,14 +1,14 @@
 [package]
-name = "ld-tantivy-bitpacker"
+name = "ld-lucivy-bitpacker"
 version = "0.26.0"
 edition = "2024"
 authors = ["Paul Masurel <paul.masurel@gmail.com>"]
 license = "MIT"
 categories = []
-description = """Tantivy-sub crate: bitpacking"""
+description = """Lucivy-sub crate: bitpacking"""
 repository = "https://github.com/quickwit-oss/tantivy"
 keywords = []
-documentation = "https://docs.rs/tantivy-bitpacker/latest/tantivy_bitpacker"
+documentation = "https://docs.rs/tantivy-bitpacker/latest/lucivy_bitpacker"
 homepage = "https://github.com/quickwit-oss/tantivy"
 
 

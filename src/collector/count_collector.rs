@@ -6,10 +6,10 @@ use crate::{DocId, Score, SegmentOrdinal, SegmentReader};
 /// documents match the query.
 ///
 /// ```rust
-/// use tantivy::collector::Count;
-/// use tantivy::query::QueryParser;
-/// use tantivy::schema::{Schema, TEXT};
-/// use tantivy::{doc, Index};
+/// use lucivy::collector::Count;
+/// use lucivy::query::QueryParser;
+/// use lucivy::schema::{Schema, TEXT};
+/// use lucivy::{doc, Index};
 ///
 /// let mut schema_builder = Schema::builder();
 /// let title = schema_builder.add_text_field("title", TEXT);

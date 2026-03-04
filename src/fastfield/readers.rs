@@ -12,7 +12,7 @@ use crate::core::json_utils::{encode_column_name, json_path_sep_to_dot};
 use crate::directory::FileSlice;
 use crate::schema::{Field, FieldEntry, FieldType, Schema};
 use crate::space_usage::{FieldUsage, PerFieldSpaceUsage};
-use crate::TantivyError;
+use crate::LucivyError;
 
 /// Provides access to all of the BitpackedFastFieldReader.
 ///
@@ -98,7 +98,7 @@ impl FastFieldReaders {
         };
         let field_entry: &FieldEntry = self.schema.get_field_entry(field);
         if !field_entry.is_fast() {
-            return Err(TantivyError::InvalidArgument(format!(
+            return Err(LucivyError::InvalidArgument(format!(
                 "Field {field_name:?} is not configured as fast field"
             )));
         }
@@ -173,7 +173,7 @@ impl FastFieldReaders {
     {
         let col_opt: Option<Column<T>> = self.column_opt(field)?;
         col_opt.ok_or_else(|| {
-            crate::TantivyError::SchemaError(format!(
+            crate::LucivyError::SchemaError(format!(
                 "Field `{field}` is missing or is not configured as a fast field."
             ))
         })
@@ -413,7 +413,7 @@ impl FastFieldReaders {
     {
         let col_opt: Option<Column<T>> = self.column_opt_async(field).await?;
         col_opt.ok_or_else(|| {
-            crate::TantivyError::SchemaError(format!(
+            crate::LucivyError::SchemaError(format!(
                 "Field `{field}` is missing or is not configured as a fast field."
             ))
         })
@@ -491,7 +491,7 @@ mod tests {
     use columnar::ColumnType;
 
     use crate::schema::{JsonObjectOptions, Schema, FAST};
-    use crate::{Index, IndexWriter, TantivyDocument};
+    use crate::{Index, IndexWriter, LucivyDocument};
 
     #[test]
     fn test_fast_field_reader_resolve_with_dynamic_internal() {
@@ -509,7 +509,7 @@ mod tests {
         let index = Index::create_in_ram(schema);
         let mut index_writer: IndexWriter = index.writer_for_tests().unwrap();
         index_writer
-            .add_document(TantivyDocument::default())
+            .add_document(LucivyDocument::default())
             .unwrap();
         index_writer.commit().unwrap();
         let reader = index.reader().unwrap();

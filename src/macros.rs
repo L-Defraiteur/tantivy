@@ -23,8 +23,8 @@
 /// # Example
 ///
 /// ```rust
-/// use tantivy::schema::{Schema, TEXT, FAST};
-/// use tantivy::doc;
+/// use lucivy::schema::{Schema, TEXT, FAST};
+/// use lucivy::doc;
 ///
 /// //...
 ///
@@ -45,12 +45,12 @@
 macro_rules! doc(
     () => {
         {
-            ($crate::TantivyDocument::default())
+            ($crate::LucivyDocument::default())
         }
     }; // avoids a warning due to the useless `mut`.
     ($($field:expr => $value:expr),*) => {
         {
-            let mut document = $crate::TantivyDocument::default();
+            let mut document = $crate::LucivyDocument::default();
             $(
                 document.add_field_value($field, &$value);
             )*

@@ -658,7 +658,7 @@ mod bench {
 
     use crate::docset::TERMINATED;
     use crate::query::Intersection;
-    use crate::schema::{Field, IndexRecordOption, Schema, TantivyDocument, Term, STRING};
+    use crate::schema::{Field, IndexRecordOption, Schema, LucivyDocument, Term, STRING};
     use crate::{tests, DocSet, Index, IndexWriter};
 
     pub static TERM_A: Lazy<Term> = Lazy::new(|| {
@@ -690,7 +690,7 @@ mod bench {
         {
             let mut index_writer: IndexWriter = index.writer_for_tests().unwrap();
             for _ in 0..posting_list_size {
-                let mut doc = TantivyDocument::default();
+                let mut doc = LucivyDocument::default();
                 if rng.gen_bool(1f64 / 15f64) {
                     doc.add_text(text_field, "a");
                 }

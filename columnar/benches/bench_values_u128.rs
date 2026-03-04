@@ -6,7 +6,7 @@ use common::OwnedBytes;
 use rand::rngs::StdRng;
 use rand::seq::SliceRandom;
 use rand::{Rng, SeedableRng, random};
-use tantivy_columnar::ColumnValues;
+use lucivy_columnar::ColumnValues;
 
 // TODO does this make sense for IPv6 ?
 fn generate_random() -> Vec<u64> {
@@ -25,9 +25,9 @@ fn get_u128_column_random() -> Arc<dyn ColumnValues<u128>> {
 
 fn get_u128_column_from_data(data: &[u128]) -> Arc<dyn ColumnValues<u128>> {
     let mut out = vec![];
-    tantivy_columnar::column_values::serialize_column_values_u128(&data, &mut out).unwrap();
+    lucivy_columnar::column_values::serialize_column_values_u128(&data, &mut out).unwrap();
     let out = OwnedBytes::new(out);
-    tantivy_columnar::column_values::open_u128_mapped::<u128>(out).unwrap()
+    lucivy_columnar::column_values::open_u128_mapped::<u128>(out).unwrap()
 }
 
 const FIFTY_PERCENT_RANGE: RangeInclusive<u64> = 1..=50;

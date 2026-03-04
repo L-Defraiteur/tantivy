@@ -43,14 +43,14 @@ impl<T: FastValue> SortKeyComputer for SortByStaticFastValue<T> {
         let field = schema.get_field(&self.field)?;
         let field_entry = schema.get_field_entry(field);
         if !field_entry.is_fast() {
-            return Err(crate::TantivyError::SchemaError(format!(
+            return Err(crate::LucivyError::SchemaError(format!(
                 "Field `{}` is not a fast field.",
                 self.field,
             )));
         }
         let schema_type = field_entry.field_type().value_type();
         if schema_type != T::to_type() {
-            return Err(crate::TantivyError::SchemaError(format!(
+            return Err(crate::LucivyError::SchemaError(format!(
                 "Field `{}` is of type {schema_type:?}, not of the type {:?}.",
                 &self.field,
                 T::to_type()

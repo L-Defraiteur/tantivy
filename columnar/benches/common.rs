@@ -1,9 +1,9 @@
-extern crate tantivy_columnar;
+extern crate lucivy_columnar;
 
 use core::fmt;
 use std::fmt::{Display, Formatter};
 
-use tantivy_columnar::{ColumnarReader, ColumnarWriter};
+use lucivy_columnar::{ColumnarReader, ColumnarWriter};
 
 pub enum Card {
     MultiSparse,

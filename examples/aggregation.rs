@@ -7,14 +7,14 @@
 // ---
 
 use serde_json::{Deserializer, Value};
-use tantivy::aggregation::agg_req::Aggregations;
-use tantivy::aggregation::agg_result::AggregationResults;
-use tantivy::aggregation::AggregationCollector;
-use tantivy::query::AllQuery;
-use tantivy::schema::{self, IndexRecordOption, Schema, TextFieldIndexing, FAST};
-use tantivy::{Index, IndexWriter, TantivyDocument};
+use lucivy::aggregation::agg_req::Aggregations;
+use lucivy::aggregation::agg_result::AggregationResults;
+use lucivy::aggregation::AggregationCollector;
+use lucivy::query::AllQuery;
+use lucivy::schema::{self, IndexRecordOption, Schema, TextFieldIndexing, FAST};
+use lucivy::{Index, IndexWriter, LucivyDocument};
 
-fn main() -> tantivy::Result<()> {
+fn main() -> lucivy::Result<()> {
     // # Create Schema
     //
     // Lets create a schema for a footwear shop, with 4 fields: name, category, stock and price.
@@ -28,7 +28,7 @@ fn main() -> tantivy::Result<()> {
     // - `raw` tokenizer
     //
     // The tokenizer is set to "raw", because the fast field uses the same dictionary as the
-    // inverted index. (This behaviour will change in tantivy 0.20, where the fast field will
+    // inverted index. (This behaviour will change in lucivy 0.20, where the fast field will
     // always be raw tokenized independent from the regular tokenizing)
     //
     let text_fieldtype = schema::TextOptions::default()
@@ -135,7 +135,7 @@ fn main() -> tantivy::Result<()> {
     let mut index_writer: IndexWriter = index.writer(50_000_000)?;
     let mut num_indexed = 0;
     for value in stream {
-        let doc = TantivyDocument::parse_json(&schema, &serde_json::to_string(&value.unwrap())?)?;
+        let doc = LucivyDocument::parse_json(&schema, &serde_json::to_string(&value.unwrap())?)?;
         index_writer.add_document(doc)?;
         num_indexed += 1;
         if num_indexed > 4 {

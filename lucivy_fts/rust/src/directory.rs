@@ -12,8 +12,8 @@ use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 
-use ld_tantivy::directory::error::{DeleteError, OpenReadError, OpenWriteError};
-use ld_tantivy::directory::{
+use ld_lucivy::directory::error::{DeleteError, OpenReadError, OpenWriteError};
+use ld_lucivy::directory::{
     AntiCallToken, Directory, FileHandle, FileSlice, TerminatingWrite, WatchCallback,
     WatchCallbackList, WatchHandle, WritePtr,
 };
@@ -179,12 +179,12 @@ impl Directory for StdFsDirectory {
         Ok(())
     }
 
-    fn watch(&self, watch_callback: WatchCallback) -> ld_tantivy::Result<WatchHandle> {
+    fn watch(&self, watch_callback: WatchCallback) -> ld_lucivy::Result<WatchHandle> {
         Ok(self
             .watch_router
             .write()
             .map_err(|_| {
-                ld_tantivy::TantivyError::SystemError("watch lock poisoned".to_string())
+                ld_lucivy::LucivyError::SystemError("watch lock poisoned".to_string())
             })?
             .subscribe(watch_callback))
     }

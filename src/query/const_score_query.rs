@@ -2,7 +2,7 @@ use std::fmt;
 
 use crate::docset::COLLECT_BLOCK_BUFFER_LEN;
 use crate::query::{EnableScoring, Explanation, Query, Scorer, Weight};
-use crate::{DocId, DocSet, Score, SegmentReader, TantivyError, Term};
+use crate::{DocId, DocSet, Score, SegmentReader, LucivyError, Term};
 
 /// `ConstScoreQuery` is a wrapper over a query to provide a constant score.
 /// It can avoid unnecessary score computation on the wrapped query.
@@ -71,7 +71,7 @@ impl Weight for ConstWeight {
     fn explain(&self, reader: &SegmentReader, doc: u32) -> crate::Result<Explanation> {
         let mut scorer = self.scorer(reader, 1.0)?;
         if scorer.seek(doc) != doc {
-            return Err(TantivyError::InvalidArgument(format!(
+            return Err(LucivyError::InvalidArgument(format!(
                 "Document #({doc}) does not match"
             )));
         }
@@ -148,14 +148,14 @@ mod tests {
     use super::ConstScoreQuery;
     use crate::query::{AllQuery, Query};
     use crate::schema::Schema;
-    use crate::{DocAddress, Index, IndexWriter, TantivyDocument};
+    use crate::{DocAddress, Index, IndexWriter, LucivyDocument};
 
     #[test]
     fn test_const_score_query_explain() -> crate::Result<()> {
         let schema = Schema::builder().build();
         let index = Index::create_in_ram(schema);
         let mut index_writer: IndexWriter = index.writer_for_tests()?;
-        index_writer.add_document(TantivyDocument::new())?;
+        index_writer.add_document(LucivyDocument::new())?;
         index_writer.commit()?;
         let reader = index.reader()?;
         let searcher = reader.searcher();

@@ -4,7 +4,7 @@ use std::ops::Deref;
 use super::{Collector, SegmentCollector};
 use crate::collector::Fruit;
 use crate::schema::Schema;
-use crate::{DocId, Score, SegmentOrdinal, SegmentReader, TantivyError};
+use crate::{DocId, Score, SegmentOrdinal, SegmentReader, LucivyError};
 
 /// MultiFruit keeps Fruits from every nested Collector
 pub struct MultiFruit {
@@ -45,7 +45,7 @@ impl<TCollector: Collector> Collector for CollectorWrapper<TCollector> {
                     .downcast::<<TCollector::Child as SegmentCollector>::Fruit>()
                     .map(|boxed_but_typed| *boxed_but_typed)
                     .map_err(|_| {
-                        TantivyError::InvalidArgument("Failed to cast child fruit.".to_string())
+                        LucivyError::InvalidArgument("Failed to cast child fruit.".to_string())
                     })
             })
             .collect::<crate::Result<_>>()?;
@@ -131,12 +131,12 @@ impl<TFruit: Fruit> FruitHandle<TFruit> {
 /// documentation](./index.html#combining-several-collectors).
 ///
 /// ```rust
-/// use tantivy::collector::{Count, TopDocs, MultiCollector};
-/// use tantivy::query::QueryParser;
-/// use tantivy::schema::{Schema, TEXT};
-/// use tantivy::{doc, Index};
+/// use lucivy::collector::{Count, TopDocs, MultiCollector};
+/// use lucivy::query::QueryParser;
+/// use lucivy::schema::{Schema, TEXT};
+/// use lucivy::{doc, Index};
 ///
-/// # fn main() -> tantivy::Result<()> {
+/// # fn main() -> lucivy::Result<()> {
 /// let mut schema_builder = Schema::builder();
 /// let title = schema_builder.add_text_field("title", TEXT);
 /// let schema = schema_builder.build();

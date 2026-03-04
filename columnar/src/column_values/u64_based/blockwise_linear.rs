@@ -4,7 +4,7 @@ use std::{io, iter};
 
 use common::{BinarySerializable, CountingWriter, DeserializeFrom, OwnedBytes};
 use fastdivide::DividerU64;
-use tantivy_bitpacker::{BitPacker, BitUnpacker, compute_num_bits};
+use lucivy_bitpacker::{BitPacker, BitUnpacker, compute_num_bits};
 
 use crate::MonotonicallyMappableToU64;
 use crate::column_values::u64_based::line::Line;

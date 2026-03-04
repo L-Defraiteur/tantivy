@@ -1,6 +1,6 @@
-//! # Tantivy-Columnar
+//! # Lucivy-Columnar
 //!
-//! `tantivy-columnar`provides a columnar storage for tantivy.
+//! `lucivy-columnar`provides a columnar storage for lucivy.
 //! The crate allows for efficient read operations on specific columns rather than entire records.
 //!
 //! ## Overview

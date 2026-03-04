@@ -3,7 +3,7 @@ use std::io::{self, Read, Write};
 
 use byteorder::{ByteOrder, LittleEndian};
 use common::{BinarySerializable, FixedSize};
-use tantivy_bitpacker::{compute_num_bits, BitPacker};
+use lucivy_bitpacker::{compute_num_bits, BitPacker};
 
 use crate::directory::{FileSlice, OwnedBytes};
 use crate::postings::TermInfo;
@@ -331,7 +331,7 @@ impl TermInfoStoreWriter {
 mod tests {
 
     use common::BinarySerializable;
-    use tantivy_bitpacker::{compute_num_bits, BitPacker};
+    use lucivy_bitpacker::{compute_num_bits, BitPacker};
 
     use super::{extract_bits, TermInfoBlockMeta, TermInfoStore, TermInfoStoreWriter};
     use crate::directory::FileSlice;

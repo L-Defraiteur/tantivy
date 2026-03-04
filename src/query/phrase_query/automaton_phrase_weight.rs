@@ -153,7 +153,7 @@ impl AutomatonPhraseWeight {
         let escaped = regex::escape(token);
         let pattern = format!(".*{escaped}.*");
         let regex = Regex::new(&pattern).map_err(|e| {
-            crate::TantivyError::InvalidArgument(format!("Invalid contains regex: {e}"))
+            crate::LucivyError::InvalidArgument(format!("Invalid contains regex: {e}"))
         })?;
         let mut stream = term_dict.search(&regex).into_stream()?;
         let mut term_infos = Vec::new();
@@ -211,7 +211,7 @@ impl AutomatonPhraseWeight {
             cascade_distances.push(level.distance());
             num_terms += term_infos.len();
             if num_terms > self.max_expansions as usize {
-                return Err(crate::TantivyError::InvalidArgument(format!(
+                return Err(crate::LucivyError::InvalidArgument(format!(
                     "Contains query exceeded max expansions {num_terms}"
                 )));
             }
@@ -223,7 +223,7 @@ impl AutomatonPhraseWeight {
         if self.needs_validation() {
             let store_reader = reader
                 .get_store_reader(50)
-                .map_err(crate::TantivyError::from)?;
+                .map_err(crate::LucivyError::from)?;
             let text_field = self.stored_field.unwrap_or(self.field);
             Ok(Some(Box::new(ContainsScorer::new(
                 posting_lists,
@@ -285,7 +285,7 @@ impl AutomatonPhraseWeight {
         if self.needs_validation() {
             let store_reader = reader
                 .get_store_reader(50)
-                .map_err(crate::TantivyError::from)?;
+                .map_err(crate::LucivyError::from)?;
             let text_field = self.stored_field.unwrap_or(self.field);
             Ok(Box::new(ContainsSingleScorer::new(
                 BitSetDocSet::from(doc_bitset),

@@ -1,4 +1,4 @@
-//! Tantivy can (if instructed to do so in the schema) store the term positions in a given field.
+//! Lucivy can (if instructed to do so in the schema) store the term positions in a given field.
 //!
 //! This position is expressed as token ordinal. For instance,
 //! In "The beauty and the beast", the term "the" appears in position 0 and position 3.
@@ -8,7 +8,7 @@
 //! bitpacked positions delta, for all terms of a given field, one term after the other.
 //!
 //! Each term is encoded independently.
-//! Like for posting lists, tantivy relies on simd bitpacking to encode the positions delta in
+//! Like for posting lists, lucivy relies on simd bitpacking to encode the positions delta in
 //! blocks of 128 deltas. Because we rarely have a multiple of 128, the final block encodes
 //! the remaining values with variable int encoding.
 //!

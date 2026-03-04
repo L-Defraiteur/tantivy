@@ -2,16 +2,16 @@
 //
 // In this example, we'll see how to define a tokenizer
 // by creating a custom `NgramTokenizer`.
-use tantivy::collector::TopDocs;
-use tantivy::query::QueryParser;
-use tantivy::schema::*;
-use tantivy::tokenizer::NgramTokenizer;
-use tantivy::{doc, Index, IndexWriter};
+use lucivy::collector::TopDocs;
+use lucivy::query::QueryParser;
+use lucivy::schema::*;
+use lucivy::tokenizer::NgramTokenizer;
+use lucivy::{doc, Index, IndexWriter};
 
-fn main() -> tantivy::Result<()> {
+fn main() -> lucivy::Result<()> {
     // # Defining the schema
     //
-    // The Tantivy index requires a very strict schema.
+    // The Lucivy index requires a very strict schema.
     // The schema declares which fields are in the index,
     // and for each field, its type and "the way it should
     // be indexed".
@@ -93,7 +93,7 @@ fn main() -> tantivy::Result<()> {
 
     // The query parser can interpret human queries.
     // Here, if the user does not specify which
-    // field they want to search, tantivy will search
+    // field they want to search, lucivy will search
     // in both title and body.
     let query_parser = QueryParser::for_index(&index, vec![title, body]);
 
@@ -103,7 +103,7 @@ fn main() -> tantivy::Result<()> {
     let top_docs = searcher.search(&query, &TopDocs::with_limit(10).order_by_score())?;
 
     for (_, doc_address) in top_docs {
-        let retrieved_doc: TantivyDocument = searcher.doc(doc_address)?;
+        let retrieved_doc: LucivyDocument = searcher.doc(doc_address)?;
         println!("{}", retrieved_doc.to_json(&schema));
     }
 

@@ -27,14 +27,14 @@ fn is_managed(path: &Path) -> bool {
         .unwrap_or(true)
 }
 
-/// Wrapper of directories that keeps track of files created by Tantivy.
+/// Wrapper of directories that keeps track of files created by Lucivy.
 ///
 /// A managed directory is just a wrapper of a directory
 /// that keeps a (persisted) list of the files that
-/// have been created (and not deleted) by tantivy so far.
+/// have been created (and not deleted) by lucivy so far.
 ///
 /// Thanks to this list, it implements a `garbage_collect` method
-/// that removes the files that were created by tantivy and are not
+/// that removes the files that were created by lucivy and are not
 /// useful anymore.
 #[derive(Debug)]
 pub struct ManagedDirectory {
@@ -48,7 +48,7 @@ struct MetaInformation {
 }
 
 /// Saves the file containing the list of existing files
-/// that were created by tantivy.
+/// that were created by lucivy.
 fn save_managed_paths(
     directory: &dyn Directory,
     wlock: &RwLockWriteGuard<'_, MetaInformation>,
@@ -87,7 +87,7 @@ impl ManagedDirectory {
             }),
             io_err @ Err(OpenReadError::IoError { .. }) => Err(io_err.err().unwrap().into()),
             Err(OpenReadError::IncompatibleIndex(incompatibility)) => {
-                Err(crate::TantivyError::IncompatibleIndex(incompatibility))
+                Err(crate::LucivyError::IncompatibleIndex(incompatibility))
             }
         }
     }
@@ -107,7 +107,7 @@ impl ManagedDirectory {
 
     /// Garbage collect unused files.
     ///
-    /// Removes the files that were created by `tantivy` and are not
+    /// Removes the files that were created by `lucivy` and are not
     /// used by any segment anymore.
     ///
     /// * `living_files` - List of files that are still used by the index.
@@ -159,7 +159,7 @@ impl ManagedDirectory {
                 }
                 Err(err) => {
                     error!("Failed to acquire lock for GC");
-                    return Err(crate::TantivyError::from(err));
+                    return Err(crate::LucivyError::from(err));
                 }
             }
         }

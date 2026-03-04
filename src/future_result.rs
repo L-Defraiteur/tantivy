@@ -2,7 +2,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::Poll;
 
-use crate::TantivyError;
+use crate::LucivyError;
 
 /// `FutureResult` is a handle that makes it possible to wait for the completion
 /// of an ongoing task.
@@ -19,15 +19,15 @@ pub struct FutureResult<T> {
 }
 
 enum Inner<T> {
-    FailedBeforeStart(Option<TantivyError>),
+    FailedBeforeStart(Option<LucivyError>),
     InProgress {
         receiver: oneshot::Receiver<crate::Result<T>>,
         error_msg_if_failure: &'static str,
     },
 }
 
-impl<T> From<TantivyError> for FutureResult<T> {
-    fn from(err: TantivyError) -> Self {
+impl<T> From<LucivyError> for FutureResult<T> {
+    fn from(err: LucivyError) -> Self {
         FutureResult {
             inner: Inner::FailedBeforeStart(Some(err)),
         }
@@ -56,7 +56,7 @@ impl<T> FutureResult<T> {
                 receiver,
                 error_msg_if_failure,
             } => receiver.recv().unwrap_or_else(|_| {
-                Err(crate::TantivyError::SystemError(
+                Err(crate::LucivyError::SystemError(
                     error_msg_if_failure.to_string(),
                 ))
             }),
@@ -77,7 +77,7 @@ impl<T> Future for FutureResult<T> {
                 } => match Future::poll(Pin::new_unchecked(receiver), cx) {
                     Poll::Ready(oneshot_res) => {
                         let res = oneshot_res.unwrap_or_else(|_| {
-                            Err(crate::TantivyError::SystemError(
+                            Err(crate::LucivyError::SystemError(
                                 error_msg_if_failure.to_string(),
                             ))
                         });
@@ -95,13 +95,13 @@ mod tests {
     use futures::executor::block_on;
 
     use super::FutureResult;
-    use crate::TantivyError;
+    use crate::LucivyError;
 
     #[test]
     fn test_scheduled_result_failed_to_schedule() {
-        let scheduled_result: FutureResult<()> = FutureResult::from(TantivyError::Poisoned);
+        let scheduled_result: FutureResult<()> = FutureResult::from(LucivyError::Poisoned);
         let res = block_on(scheduled_result);
-        assert!(matches!(res, Err(TantivyError::Poisoned)));
+        assert!(matches!(res, Err(LucivyError::Poisoned)));
     }
 
     #[test]
@@ -110,7 +110,7 @@ mod tests {
         let (scheduled_result, tx): (FutureResult<()>, _) = FutureResult::create("failed");
         drop(tx);
         let res = block_on(scheduled_result);
-        assert!(matches!(res, Err(TantivyError::SystemError(_))));
+        assert!(matches!(res, Err(LucivyError::SystemError(_))));
     }
 
     #[test]
@@ -123,8 +123,8 @@ mod tests {
     #[test]
     fn test_scheduled_result_sent_error() {
         let (scheduled_result, tx): (FutureResult<u64>, _) = FutureResult::create("failed");
-        tx.send(Err(TantivyError::Poisoned)).unwrap();
+        tx.send(Err(LucivyError::Poisoned)).unwrap();
         let res = block_on(scheduled_result);
-        assert!(matches!(res, Err(TantivyError::Poisoned)));
+        assert!(matches!(res, Err(LucivyError::Poisoned)));
     }
 }

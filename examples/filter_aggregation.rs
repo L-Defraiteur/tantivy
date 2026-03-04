@@ -8,13 +8,13 @@
 // electronics + count of in-stock items".
 
 use serde_json::json;
-use tantivy::aggregation::agg_req::Aggregations;
-use tantivy::aggregation::AggregationCollector;
-use tantivy::query::AllQuery;
-use tantivy::schema::{Schema, FAST, INDEXED, TEXT};
-use tantivy::{doc, Index};
+use lucivy::aggregation::agg_req::Aggregations;
+use lucivy::aggregation::AggregationCollector;
+use lucivy::query::AllQuery;
+use lucivy::schema::{Schema, FAST, INDEXED, TEXT};
+use lucivy::{doc, Index};
 
-fn main() -> tantivy::Result<()> {
+fn main() -> lucivy::Result<()> {
     // Create a simple product schema
     let mut schema_builder = Schema::builder();
     schema_builder.add_text_field("category", TEXT | FAST);

@@ -1,9 +1,9 @@
 use super::IndexWriter;
 use crate::schema::document::Document;
-use crate::{FutureResult, Opstamp, TantivyDocument};
+use crate::{FutureResult, Opstamp, LucivyDocument};
 
 /// A prepared commit
-pub struct PreparedCommit<'a, D: Document = TantivyDocument> {
+pub struct PreparedCommit<'a, D: Document = LucivyDocument> {
     index_writer: &'a mut IndexWriter<D>,
     payload: Option<String>,
     opstamp: Opstamp,

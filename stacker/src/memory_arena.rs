@@ -1,5 +1,5 @@
 //! 32-bits Memory arena for types implementing `Copy`.
-//! This Memory arena has been implemented to fit the use of tantivy's indexer
+//! This Memory arena has been implemented to fit the use of lucivy's indexer
 //! and has *twisted specifications*.
 //!
 //! - It works on stable rust.
@@ -12,7 +12,7 @@
 //! # Limitations
 //!
 //! - Your object shall not implement `Drop`.
-//! - `Addr` to the `Arena` are 32-bits. The maximum capacity of the arena is 4GB. *(Tantivy's
+//! - `Addr` to the `Arena` are 32-bits. The maximum capacity of the arena is 4GB. *(Lucivy's
 //!   indexer uses one arena per indexing thread.)*
 //! - The arena only works for objects much smaller than  `1MB`. Allocating more than `1MB` at a
 //!   time will result in a panic, and allocating a lot of large object (> 500KB) will result in a

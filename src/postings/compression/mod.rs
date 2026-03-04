@@ -100,7 +100,7 @@ impl BlockDecoder {
 
     /// Decompress block of sorted integers.
     ///
-    /// `strict_delta` depends on what encoding was used. Older version of tantivy never use strict
+    /// `strict_delta` depends on what encoding was used. Older version of lucivy never use strict
     /// deltas, newer versions always use them.
     pub fn uncompress_block_sorted(
         &mut self,
@@ -128,7 +128,7 @@ impl BlockDecoder {
 
     /// Decompress block of unsorted integers.
     ///
-    /// `minus_one_encoded` depends on what encoding was used. Older version of tantivy never use
+    /// `minus_one_encoded` depends on what encoding was used. Older version of lucivy never use
     /// that encoding. Newer version use it for some structures, but not all. See the corresponding
     /// call to `BlockEncoder::compress_block_unsorted`.
     pub fn uncompress_block_unsorted(

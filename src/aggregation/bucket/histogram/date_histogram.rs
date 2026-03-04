@@ -138,25 +138,25 @@ impl DateHistogramAggregationReq {
 
     fn validate(&self) -> crate::Result<()> {
         if let Some(interval) = self.interval.as_ref() {
-            return Err(crate::TantivyError::InvalidArgument(format!(
+            return Err(crate::LucivyError::InvalidArgument(format!(
                 "`interval` parameter {interval:?} in date histogram is unsupported, only \
                  `fixed_interval` is supported"
             )));
         }
         if let Some(interval) = self.calendar_interval.as_ref() {
-            return Err(crate::TantivyError::InvalidArgument(format!(
+            return Err(crate::LucivyError::InvalidArgument(format!(
                 "`calendar_interval` parameter {interval:?} in date histogram is unsupported, \
                  only `fixed_interval` is supported"
             )));
         }
         if self.format.is_some() {
-            return Err(crate::TantivyError::InvalidArgument(
+            return Err(crate::LucivyError::InvalidArgument(
                 "format parameter on date_histogram is unsupported".to_string(),
             ));
         }
 
         if self.fixed_interval.is_none() {
-            return Err(crate::TantivyError::InvalidArgument(
+            return Err(crate::LucivyError::InvalidArgument(
                 "fixed_interval in date histogram is missing".to_string(),
             ));
         }
@@ -252,7 +252,7 @@ pub(crate) mod tests {
     use crate::aggregation::tests::exec_request;
     use crate::indexer::NoMergePolicy;
     use crate::schema::{Schema, FAST, STRING};
-    use crate::{Index, IndexWriter, TantivyDocument};
+    use crate::{Index, IndexWriter, LucivyDocument};
 
     #[test]
     fn test_parse_into_millisecs() {
@@ -317,7 +317,7 @@ pub(crate) mod tests {
             index_writer.set_merge_policy(Box::new(NoMergePolicy));
             for values in segment_and_docs {
                 for doc_str in values {
-                    let doc = TantivyDocument::parse_json(&schema, doc_str)?;
+                    let doc = LucivyDocument::parse_json(&schema, doc_str)?;
                     index_writer.add_document(doc)?;
                 }
                 // writing the segment

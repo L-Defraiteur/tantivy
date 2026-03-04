@@ -3,7 +3,7 @@ use std::sync::Arc;
 #[cfg(feature = "quickwit")]
 use futures_util::{future::Either, FutureExt};
 
-use crate::TantivyError;
+use crate::LucivyError;
 
 /// Executor makes it possible to run tasks in single thread or
 /// in a thread pool.
@@ -92,7 +92,7 @@ impl Executor {
                 }
                 let results: Vec<R> = result_placeholders.into_iter().flatten().collect();
                 if results.len() != num_fruits {
-                    return Err(TantivyError::InternalError(
+                    return Err(LucivyError::InternalError(
                         "One of the mapped execution failed.".to_string(),
                     ));
                 }

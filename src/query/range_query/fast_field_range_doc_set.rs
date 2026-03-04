@@ -214,7 +214,7 @@ mod tests {
     use crate::collector::Count;
     use crate::directory::RamDirectory;
     use crate::query::RangeQuery;
-    use crate::{schema, IndexBuilder, TantivyDocument, Term};
+    use crate::{schema, IndexBuilder, LucivyDocument, Term};
 
     #[test]
     fn range_query_fast_optional_field_minimum() {
@@ -233,7 +233,7 @@ mod tests {
 
             let count = 1000;
             for i in 0..count {
-                let mut doc = TantivyDocument::new();
+                let mut doc = LucivyDocument::new();
                 doc.add_text(id_field, format!("doc{i}"));
 
                 let nb_scores = i % 2; // 0 or 1 scores
@@ -275,7 +275,7 @@ mod tests {
 
             // Add documents with values in the range [10, 20]
             for i in 0..100 {
-                let mut doc = TantivyDocument::new();
+                let mut doc = LucivyDocument::new();
                 doc.add_text(id_field, format!("doc{i}"));
                 doc.add_u64(value_field, 10 + (i % 11) as u64); // values in range 10-20
 

@@ -1,6 +1,6 @@
 use binggan::{InputGroup, black_box};
 use common::*;
-use tantivy_columnar::Column;
+use lucivy_columnar::Column;
 
 pub mod common;
 

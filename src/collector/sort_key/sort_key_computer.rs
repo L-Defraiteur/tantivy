@@ -501,7 +501,7 @@ mod tests {
         let index = Index::create_in_ram(schema);
         let mut index_writer = index.writer_for_tests().unwrap();
         index_writer
-            .add_document(crate::TantivyDocument::default())
+            .add_document(crate::LucivyDocument::default())
             .unwrap();
         index_writer.commit().unwrap();
         index

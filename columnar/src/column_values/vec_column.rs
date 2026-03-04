@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use tantivy_bitpacker::minmax;
+use lucivy_bitpacker::minmax;
 
 use crate::ColumnValues;
 

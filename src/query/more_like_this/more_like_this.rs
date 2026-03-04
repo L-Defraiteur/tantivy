@@ -8,7 +8,7 @@ use crate::query::{BooleanQuery, BoostQuery, Occur, Query, TermQuery};
 use crate::schema::document::{Document, Value};
 use crate::schema::{Field, FieldType, IndexRecordOption, Term};
 use crate::tokenizer::{FacetTokenizer, PreTokenizedStream, TokenStream, Tokenizer};
-use crate::{DocAddress, Result, Searcher, TantivyDocument, TantivyError};
+use crate::{DocAddress, Result, Searcher, LucivyDocument, LucivyError};
 
 #[derive(Debug, PartialEq)]
 struct ScoreTerm {
@@ -40,7 +40,7 @@ impl Ord for ScoreTerm {
 
 /// A struct used as helper to build [`MoreLikeThisQuery`](crate::query::MoreLikeThisQuery)
 /// This more-like-this implementation is inspired by the Apache Lucene
-/// and closely follows the same implementation with adaptation to Tantivy vocabulary and API.
+/// and closely follows the same implementation with adaptation to Lucivy vocabulary and API.
 ///
 /// [MoreLikeThis](https://github.com/apache/lucene/blob/main/lucene/queries/src/java/org/apache/lucene/queries/mlt/MoreLikeThis.java#L147)
 /// [MoreLikeThisQuery](https://github.com/apache/lucene/blob/main/lucene/queries/src/java/org/apache/lucene/queries/mlt/MoreLikeThisQuery.java#L36)
@@ -129,7 +129,7 @@ impl MoreLikeThis {
         searcher: &Searcher,
         doc_address: DocAddress,
     ) -> Result<Vec<ScoreTerm>> {
-        let doc = searcher.doc::<TantivyDocument>(doc_address)?;
+        let doc = searcher.doc::<LucivyDocument>(doc_address)?;
 
         let field_to_values = doc.get_sorted_field_values();
         self.retrieve_terms_from_doc_fields(searcher, &field_to_values)
@@ -143,7 +143,7 @@ impl MoreLikeThis {
         field_to_values: &[(Field, Vec<V>)],
     ) -> Result<Vec<ScoreTerm>> {
         if field_to_values.is_empty() {
-            return Err(TantivyError::InvalidArgument(
+            return Err(LucivyError::InvalidArgument(
                 "Cannot create more like this query on empty field values. The document may not \
                  have stored fields"
                     .to_string(),
@@ -181,7 +181,7 @@ impl MoreLikeThis {
                     .iter()
                     .map(|value| {
                         value.as_facet().ok_or_else(|| {
-                            TantivyError::InvalidArgument("invalid field value".to_string())
+                            LucivyError::InvalidArgument("invalid field value".to_string())
                         })
                     })
                     .collect::<Result<Vec<_>>>()?;
@@ -228,7 +228,7 @@ impl MoreLikeThis {
             FieldType::U64(_) => {
                 for value in values {
                     let val = value.as_u64().ok_or_else(|| {
-                        TantivyError::InvalidArgument("invalid value".to_string())
+                        LucivyError::InvalidArgument("invalid value".to_string())
                     })?;
                     if !self.is_noise_word(val.to_string()) {
                         let term = Term::from_field_u64(field, val);
@@ -239,7 +239,7 @@ impl MoreLikeThis {
             FieldType::Date(_) => {
                 for value in values {
                     let timestamp = value.as_datetime().ok_or_else(|| {
-                        TantivyError::InvalidArgument("invalid value".to_string())
+                        LucivyError::InvalidArgument("invalid value".to_string())
                     })?;
                     let term = Term::from_field_date_for_search(field, timestamp);
                     *term_frequencies.entry(term).or_insert(0) += 1;
@@ -248,7 +248,7 @@ impl MoreLikeThis {
             FieldType::I64(_) => {
                 for value in values {
                     let val = value.as_i64().ok_or_else(|| {
-                        TantivyError::InvalidArgument("invalid value".to_string())
+                        LucivyError::InvalidArgument("invalid value".to_string())
                     })?;
                     if !self.is_noise_word(val.to_string()) {
                         let term = Term::from_field_i64(field, val);
@@ -259,7 +259,7 @@ impl MoreLikeThis {
             FieldType::F64(_) => {
                 for value in values {
                     let val = value.as_f64().ok_or_else(|| {
-                        TantivyError::InvalidArgument("invalid value".to_string())
+                        LucivyError::InvalidArgument("invalid value".to_string())
                     })?;
                     if !self.is_noise_word(val.to_string()) {
                         let term = Term::from_field_f64(field, val);

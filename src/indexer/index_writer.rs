@@ -10,7 +10,7 @@ use super::operation::{AddOperation, UserOperation};
 use super::segment_updater::SegmentUpdater;
 use super::{AddBatch, AddBatchReceiver, AddBatchSender, PreparedCommit};
 use crate::directory::{DirectoryLock, GarbageCollectionResult, TerminatingWrite};
-use crate::error::TantivyError;
+use crate::error::LucivyError;
 use crate::fastfield::write_alive_bitset;
 use crate::index::{Index, Segment, SegmentComponent, SegmentId, SegmentMeta, SegmentReader};
 use crate::indexer::delete_queue::{DeleteCursor, DeleteQueue};
@@ -21,7 +21,7 @@ use crate::indexer::stamper::Stamper;
 use crate::indexer::{MergePolicy, SegmentEntry, SegmentWriter};
 use crate::query::{EnableScoring, Query, TermQuery};
 use crate::schema::document::Document;
-use crate::schema::{IndexRecordOption, TantivyDocument, Term};
+use crate::schema::{IndexRecordOption, LucivyDocument, Term};
 use crate::{FutureResult, Opstamp};
 
 // Size of the margin for the `memory_arena`. A segment is closed when the remaining memory
@@ -39,8 +39,8 @@ pub const MAX_NUM_THREAD: usize = 8;
 // reaches `PIPELINE_MAX_SIZE_IN_DOCS`
 const PIPELINE_MAX_SIZE_IN_DOCS: usize = 10_000;
 
-fn error_in_index_worker_thread(context: &str) -> TantivyError {
-    TantivyError::ErrorInThread(format!(
+fn error_in_index_worker_thread(context: &str) -> LucivyError {
+    LucivyError::ErrorInThread(format!(
         "{context}. A worker thread encountered an error (io::Error most likely) or panicked."
     ))
 }
@@ -68,7 +68,7 @@ pub struct IndexWriterOptions {
 /// indexing queue.
 /// Each indexing thread builds its own independent [`Segment`], via
 /// a `SegmentWriter` object.
-pub struct IndexWriter<D: Document = TantivyDocument> {
+pub struct IndexWriter<D: Document = LucivyDocument> {
     // the lock is just used to bind the
     // lifetime of the lock with that of the IndexWriter.
     _directory_lock: Option<DirectoryLock>,
@@ -276,7 +276,7 @@ impl<D: Document> IndexWriter<D> {
     /// # Errors
     /// If the lockfile already exists, returns `Error::FileAlreadyExists`.
     /// If the memory arena per thread is too small or too big, returns
-    /// `TantivyError::InvalidArgument`
+    /// `LucivyError::InvalidArgument`
     pub(crate) fn new(
         index: &Index,
         options: IndexWriterOptions,
@@ -287,17 +287,17 @@ impl<D: Document> IndexWriter<D> {
                 "The memory arena in bytes per thread needs to be at least \
                  {MEMORY_BUDGET_NUM_BYTES_MIN}."
             );
-            return Err(TantivyError::InvalidArgument(err_msg));
+            return Err(LucivyError::InvalidArgument(err_msg));
         }
         if options.memory_budget_per_thread >= MEMORY_BUDGET_NUM_BYTES_MAX {
             let err_msg = format!(
                 "The memory arena in bytes per thread cannot exceed {MEMORY_BUDGET_NUM_BYTES_MAX}"
             );
-            return Err(TantivyError::InvalidArgument(err_msg));
+            return Err(LucivyError::InvalidArgument(err_msg));
         }
         if options.num_worker_threads == 0 {
             let err_msg = "At least one worker thread is required, got 0".to_string();
-            return Err(TantivyError::InvalidArgument(err_msg));
+            return Err(LucivyError::InvalidArgument(err_msg));
         }
 
         let (document_sender, document_receiver) =
@@ -401,7 +401,7 @@ impl<D: Document> IndexWriter<D> {
         self.index_writer_status
             .operation_receiver()
             .ok_or_else(|| {
-                crate::TantivyError::ErrorInThread(
+                crate::LucivyError::ErrorInThread(
                     "The index writer was killed. It can happen if an indexing worker encountered \
                      an Io error for instance."
                         .to_string(),
@@ -422,7 +422,7 @@ impl<D: Document> IndexWriter<D> {
         let mem_budget = self.options.memory_budget_per_thread;
         let index = self.index.clone();
         let join_handle: JoinHandle<crate::Result<()>> = thread::Builder::new()
-            .name(format!("thrd-tantivy-index{}", self.worker_id))
+            .name(format!("thrd-lucivy-index{}", self.worker_id))
             .spawn(move || {
                 loop {
                     let mut document_iterator = document_receiver_clone
@@ -490,12 +490,12 @@ impl<D: Document> IndexWriter<D> {
     /// by clearing and resubmitting necessary documents
     ///
     /// ```rust
-    /// use tantivy::collector::TopDocs;
-    /// use tantivy::query::QueryParser;
-    /// use tantivy::schema::*;
-    /// use tantivy::{doc, Index};
+    /// use lucivy::collector::TopDocs;
+    /// use lucivy::query::QueryParser;
+    /// use lucivy::schema::*;
+    /// use lucivy::{doc, Index};
     ///
-    /// fn main() -> tantivy::Result<()> {
+    /// fn main() -> lucivy::Result<()> {
     ///     let mut schema_builder = Schema::builder();
     ///     let title = schema_builder.add_text_field("title", TEXT | STORED);
     ///     let schema = schema_builder.build();
@@ -637,7 +637,7 @@ impl<D: Document> IndexWriter<D> {
         for worker_handle in former_workers_join_handle {
             let indexing_worker_result = worker_handle
                 .join()
-                .map_err(|e| TantivyError::ErrorInThread(format!("{e:?}")))?;
+                .map_err(|e| LucivyError::ErrorInThread(format!("{e:?}")))?;
             indexing_worker_result?;
             self.add_indexing_worker()?;
         }
@@ -837,7 +837,7 @@ mod tests {
     };
     use crate::store::DOCSTORE_CACHE_CAPACITY;
     use crate::{
-        DateTime, DocAddress, Index, IndexSettings, IndexWriter, ReloadPolicy, TantivyDocument,
+        DateTime, DocAddress, Index, IndexSettings, IndexWriter, ReloadPolicy, LucivyDocument,
         Term,
     };
 
@@ -975,8 +975,8 @@ mod tests {
         let schema_builder = schema::Schema::builder();
         let index = Index::create_in_ram(schema_builder.build());
         let _index_writer: IndexWriter = index.writer_for_tests().unwrap();
-        match index.writer_for_tests::<TantivyDocument>() {
-            Err(TantivyError::LockFailure(LockError::LockBusy, _)) => {}
+        match index.writer_for_tests::<LucivyDocument>() {
+            Err(LucivyError::LockFailure(LockError::LockBusy, _)) => {}
             _ => panic!("Expected a `LockFailure` error"),
         }
     }
@@ -986,7 +986,7 @@ mod tests {
         let schema_builder = schema::Schema::builder();
         let index = Index::create_in_ram(schema_builder.build());
         let _index_writer: IndexWriter = index.writer_for_tests().unwrap();
-        match index.writer_for_tests::<TantivyDocument>() {
+        match index.writer_for_tests::<LucivyDocument>() {
             Err(err) => {
                 let err_msg = err.to_string();
                 assert!(err_msg.contains("already an `IndexWriter`"));
@@ -1965,7 +1965,7 @@ mod tests {
                 .get_store_reader(DOCSTORE_CACHE_CAPACITY)
                 .unwrap();
             // test store iterator
-            for doc in store_reader.iter::<TantivyDocument>(segment_reader.alive_bitset()) {
+            for doc in store_reader.iter::<LucivyDocument>(segment_reader.alive_bitset()) {
                 let id = doc
                     .unwrap()
                     .get_first(id_field)
@@ -1978,7 +1978,7 @@ mod tests {
             // test store random access
             for doc_id in segment_reader.doc_ids_alive() {
                 let id = store_reader
-                    .get::<TantivyDocument>(doc_id)
+                    .get::<LucivyDocument>(doc_id)
                     .unwrap()
                     .get_first(id_field)
                     .unwrap()
@@ -1987,7 +1987,7 @@ mod tests {
                 assert!(expected_ids_and_num_occurrences.contains_key(&id));
                 if id_is_full_doc(id) {
                     let id2 = store_reader
-                        .get::<TantivyDocument>(doc_id)
+                        .get::<LucivyDocument>(doc_id)
                         .unwrap()
                         .get_first(multi_numbers)
                         .unwrap()
@@ -1995,13 +1995,13 @@ mod tests {
                         .unwrap();
                     assert_eq!(id, id2);
                     let bool = store_reader
-                        .get::<TantivyDocument>(doc_id)
+                        .get::<LucivyDocument>(doc_id)
                         .unwrap()
                         .get_first(bool_field)
                         .unwrap()
                         .as_bool()
                         .unwrap();
-                    let doc = store_reader.get::<TantivyDocument>(doc_id).unwrap();
+                    let doc = store_reader.get::<LucivyDocument>(doc_id).unwrap();
                     let mut bool2 = doc.get_all(multi_bools);
                     assert_eq!(bool, bool2.next().unwrap().as_bool().unwrap());
                     assert_ne!(bool, bool2.next().unwrap().as_bool().unwrap());
@@ -2561,28 +2561,28 @@ mod tests {
         let index = Index::create_in_ram(schema_builder.build());
 
         let opt_wo_threads = IndexWriterOptions::builder().num_worker_threads(0).build();
-        let result = index.writer_with_options::<TantivyDocument>(opt_wo_threads);
+        let result = index.writer_with_options::<LucivyDocument>(opt_wo_threads);
         assert!(result.is_err(), "Writer should reject 0 thread count");
-        assert!(matches!(result, Err(TantivyError::InvalidArgument(_))));
+        assert!(matches!(result, Err(LucivyError::InvalidArgument(_))));
 
         let opt_with_low_memory = IndexWriterOptions::builder()
             .memory_budget_per_thread(10 << 10)
             .build();
-        let result = index.writer_with_options::<TantivyDocument>(opt_with_low_memory);
+        let result = index.writer_with_options::<LucivyDocument>(opt_with_low_memory);
         assert!(
             result.is_err(),
             "Writer should reject options with too low memory size"
         );
-        assert!(matches!(result, Err(TantivyError::InvalidArgument(_))));
+        assert!(matches!(result, Err(LucivyError::InvalidArgument(_))));
 
         let opt_with_low_memory = IndexWriterOptions::builder()
             .memory_budget_per_thread(5 << 30)
             .build();
-        let result = index.writer_with_options::<TantivyDocument>(opt_with_low_memory);
+        let result = index.writer_with_options::<LucivyDocument>(opt_with_low_memory);
         assert!(
             result.is_err(),
             "Writer should reject options with too high memory size"
         );
-        assert!(matches!(result, Err(TantivyError::InvalidArgument(_))));
+        assert!(matches!(result, Err(LucivyError::InvalidArgument(_))));
     }
 }

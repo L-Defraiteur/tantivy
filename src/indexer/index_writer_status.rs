@@ -3,10 +3,10 @@ use std::sync::{Arc, RwLock};
 
 use super::AddBatchReceiver;
 use crate::schema::document::Document;
-use crate::TantivyDocument;
+use crate::LucivyDocument;
 
 #[derive(Clone)]
-pub(crate) struct IndexWriterStatus<D: Document = TantivyDocument> {
+pub(crate) struct IndexWriterStatus<D: Document = LucivyDocument> {
     inner: Arc<Inner<D>>,
 }
 

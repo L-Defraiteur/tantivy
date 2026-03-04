@@ -52,7 +52,7 @@ impl TokenizerManager {
 
 impl Default for TokenizerManager {
     /// Creates an `TokenizerManager` prepopulated with
-    /// the default pre-configured tokenizers of `tantivy`.
+    /// the default pre-configured tokenizers of `lucivy`.
     fn default() -> TokenizerManager {
         let manager = TokenizerManager::new();
         manager.register("raw", RawTokenizer::default());

@@ -1,6 +1,6 @@
 use crate::query::Weight;
 use crate::schema::document::Document;
-use crate::schema::{TantivyDocument, Term};
+use crate::schema::{LucivyDocument, Term};
 use crate::Opstamp;
 
 /// Timestamped Delete operation.
@@ -15,7 +15,7 @@ pub struct DeleteOperation {
 
 /// Timestamped Add operation.
 #[derive(Eq, PartialEq, Debug)]
-pub struct AddOperation<D: Document = TantivyDocument> {
+pub struct AddOperation<D: Document = LucivyDocument> {
     /// Operation stamp.
     pub opstamp: Opstamp,
     /// Document to be added.
@@ -24,7 +24,7 @@ pub struct AddOperation<D: Document = TantivyDocument> {
 
 /// UserOperation is an enum type that encapsulates other operation types.
 #[derive(Eq, PartialEq, Debug)]
-pub enum UserOperation<D: Document = TantivyDocument> {
+pub enum UserOperation<D: Document = LucivyDocument> {
     /// Add operation
     Add(D),
     /// Delete operation

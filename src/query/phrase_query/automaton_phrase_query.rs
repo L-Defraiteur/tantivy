@@ -120,7 +120,7 @@ impl AutomatonPhraseQuery {
         let field_entry = schema.get_field_entry(self.field);
         let field_type = field_entry.field_type().value_type();
         if field_type != Type::Str {
-            return Err(crate::TantivyError::SchemaError(format!(
+            return Err(crate::LucivyError::SchemaError(format!(
                 "AutomatonPhraseQuery requires a text field, got {field_type:?}"
             )));
         }
@@ -134,7 +134,7 @@ impl AutomatonPhraseQuery {
                 .unwrap_or(false);
             if !has_positions {
                 let field_name = field_entry.name();
-                return Err(crate::TantivyError::SchemaError(format!(
+                return Err(crate::LucivyError::SchemaError(format!(
                     "AutomatonPhraseQuery on field {field_name:?} requires positions indexed"
                 )));
             }

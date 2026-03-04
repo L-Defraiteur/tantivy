@@ -11,8 +11,8 @@ use crate::DocAddress;
 /// # Examples
 ///
 /// ```
-/// use tantivy::DocAddress;
-/// use tantivy::query::MoreLikeThisQuery;
+/// use lucivy::DocAddress;
+/// use lucivy::query::MoreLikeThisQuery;
 ///
 /// let query = MoreLikeThisQuery::builder()
 ///     .with_min_doc_frequency(1)
@@ -49,7 +49,7 @@ impl Query for MoreLikeThisQuery {
             EnableScoring::Enabled { searcher, .. } => searcher,
             EnableScoring::Disabled { .. } => {
                 let err = "MoreLikeThisQuery requires to enable scoring.".to_string();
-                return Err(crate::TantivyError::InvalidArgument(err));
+                return Err(crate::LucivyError::InvalidArgument(err));
             }
         };
         match &self.target {

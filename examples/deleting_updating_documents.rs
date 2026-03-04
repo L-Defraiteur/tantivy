@@ -1,17 +1,17 @@
 // # Deleting and Updating (?) documents
 //
 // This example explains how to delete and update documents.
-// In fact there is actually no such thing as an update in tantivy.
+// In fact there is actually no such thing as an update in lucivy.
 //
 // To update a document, you need to delete a document and then reinsert
 // its new version.
 //
 // ---
-// Importing tantivy...
-use tantivy::collector::TopDocs;
-use tantivy::query::TermQuery;
-use tantivy::schema::*;
-use tantivy::{doc, Index, IndexReader, IndexWriter};
+// Importing lucivy...
+use lucivy::collector::TopDocs;
+use lucivy::query::TermQuery;
+use lucivy::schema::*;
+use lucivy::{doc, Index, IndexReader, IndexWriter};
 
 // A simple helper function to fetch a single document
 // given its id from our index.
@@ -19,7 +19,7 @@ use tantivy::{doc, Index, IndexReader, IndexWriter};
 fn extract_doc_given_isbn(
     reader: &IndexReader,
     isbn_term: &Term,
-) -> tantivy::Result<Option<TantivyDocument>> {
+) -> lucivy::Result<Option<LucivyDocument>> {
     let searcher = reader.searcher();
 
     // This is the simplest query you can think of.
@@ -39,14 +39,14 @@ fn extract_doc_given_isbn(
     }
 }
 
-fn main() -> tantivy::Result<()> {
+fn main() -> lucivy::Result<()> {
     // # Defining the schema
     //
     // Check out the *basic_search* example if this makes
     // small sense to you.
     let mut schema_builder = Schema::builder();
 
-    // Tantivy does not really have a notion of primary id.
+    // Lucivy does not really have a notion of primary id.
     // This may change in the future.
     //
     // Still, we can create a `isbn` field and use it as an id. This
@@ -57,7 +57,7 @@ fn main() -> tantivy::Result<()> {
     // running any text processing on it.
     // This is done by associating this field to the tokenizer named `raw`.
     // Rather than building our
-    // [`TextOptions`](//docs.rs/tantivy/~0/tantivy/schema/struct.TextOptions.html) manually, We
+    // [`TextOptions`](//docs.rs/tantivy/~0/lucivy/schema/struct.TextOptions.html) manually, We
     // use the `STRING` shortcut. `STRING` stands for indexed (without term frequency or positions)
     // and untokenized.
     //
@@ -72,7 +72,7 @@ fn main() -> tantivy::Result<()> {
     let mut index_writer: IndexWriter = index.writer(50_000_000)?;
 
     // Let's add a couple of documents, for the sake of the example.
-    let mut old_man_doc = TantivyDocument::default();
+    let mut old_man_doc = LucivyDocument::default();
     old_man_doc.add_text(title, "The Old Man and the Sea");
     index_writer.add_document(doc!(
         isbn => "978-0099908401",
@@ -102,17 +102,17 @@ fn main() -> tantivy::Result<()> {
     //
     // Here we will want to update the typo in the `Frankenstein` book.
     //
-    // Tantivy does not handle updates directly, we need to delete
+    // Lucivy does not handle updates directly, we need to delete
     // and reinsert the document.
     //
     // This can be complicated as it means you need to have access
-    // to the entire document. It is good practise to integrate tantivy
+    // to the entire document. It is good practise to integrate lucivy
     // with a key value store for this reason.
     //
     // To remove one of the document, we just call `delete_term`
     // on its id.
     //
-    // Note that `tantivy` does nothing to enforce the idea that
+    // Note that `lucivy` does nothing to enforce the idea that
     // there is only one document associated with this id.
     //
     // Also you might have noticed that we apply the delete before

@@ -4,7 +4,7 @@
 // collector. As an example, we will compute a collector
 // that computes the standard deviation of a given fast field.
 //
-// Of course, you can have a look at the tantivy's built-in collectors
+// Of course, you can have a look at the lucivy's built-in collectors
 // such as the `CountCollector` for more examples.
 use std::fmt::Debug;
 use std::marker::PhantomData;
@@ -26,12 +26,12 @@ use crate::{DocId, Score, SegmentReader};
 ///
 ///
 /// ```rust
-/// use tantivy::collector::{TopDocs, FilterCollector};
-/// use tantivy::query::QueryParser;
-/// use tantivy::schema::{Schema, TEXT, FAST};
-/// use tantivy::{doc, DocAddress, Index};
+/// use lucivy::collector::{TopDocs, FilterCollector};
+/// use lucivy::query::QueryParser;
+/// use lucivy::schema::{Schema, TEXT, FAST};
+/// use lucivy::{doc, DocAddress, Index};
 ///
-/// # fn main() -> tantivy::Result<()> {
+/// # fn main() -> lucivy::Result<()> {
 /// let mut schema_builder = Schema::builder();
 /// let title = schema_builder.add_text_field("title", TEXT);
 /// let price = schema_builder.add_u64_field("price", FAST);
@@ -215,12 +215,12 @@ where
 /// - documents with several values are accepted if at least one value matches the predicate.
 ///
 /// ```rust
-/// use tantivy::collector::{TopDocs, BytesFilterCollector};
-/// use tantivy::query::QueryParser;
-/// use tantivy::schema::{Schema, TEXT, FAST};
-/// use tantivy::{doc, DocAddress, Index};
+/// use lucivy::collector::{TopDocs, BytesFilterCollector};
+/// use lucivy::query::QueryParser;
+/// use lucivy::schema::{Schema, TEXT, FAST};
+/// use lucivy::{doc, DocAddress, Index};
 ///
-/// # fn main() -> tantivy::Result<()> {
+/// # fn main() -> lucivy::Result<()> {
 /// let mut schema_builder = Schema::builder();
 /// let title = schema_builder.add_text_field("title", TEXT);
 /// let barcode = schema_builder.add_bytes_field("barcode", FAST);

@@ -67,7 +67,7 @@ fn open_mmap(full_path: &Path) -> Result<Option<Mmap>, OpenReadError> {
 pub struct CacheCounters {
     /// Number of time the cache prevents to call `mmap`
     pub hit: usize,
-    /// Number of time tantivy had to call `mmap`
+    /// Number of time lucivy had to call `mmap`
     /// as no entry was in the cache.
     pub miss: usize,
 }

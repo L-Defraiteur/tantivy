@@ -1,9 +1,9 @@
 # SSTable
 
-The `tantivy-sstable` crate is yet another sstable crate.
+The `lucivy-sstable` crate is yet another sstable crate.
 
 It has been designed to be used in `quickwit`:
-- as an alternative to the default tantivy fst dictionary.
+- as an alternative to the default lucivy fst dictionary.
 - as a way to store the column index for dynamic fast fields.
 
 The benefit compared to the fst crate is locality.
@@ -102,7 +102,7 @@ Note: as the SSTable does not support redundant keys, there is no ambiguity betw
 
 ### Fst
 
-Fst is in the format of tantivy\_fst
+Fst is in the format of lucivy\_fst
 
 ### BlockAddrStore
 

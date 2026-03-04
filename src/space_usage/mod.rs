@@ -1,7 +1,7 @@
-//! Representations for the space usage of various parts of a Tantivy index.
+//! Representations for the space usage of various parts of a Lucivy index.
 //!
 //! This can be used programmatically, and will also be exposed in a human readable fashion in
-//! tantivy-cli.
+//! lucivy-cli.
 //!
 //! One important caveat for all of this functionality is that none of it currently takes
 //! storage-level details into consideration. For example, if your file system block size is 4096

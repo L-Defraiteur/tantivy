@@ -1,6 +1,6 @@
 //! Index handle management.
 //!
-//! Each TantivyHandle holds an Index, an IndexWriter, and an IndexReader.
+//! Each LucivyHandle holds an Index, an IndexWriter, and an IndexReader.
 //! Handles are identified by opaque pointers passed through the C FFI.
 //!
 //! Every "text" field gets a triple-field layout:
@@ -12,10 +12,10 @@
 use std::path::Path;
 use std::sync::Mutex;
 
-use ld_tantivy::schema::{
+use ld_lucivy::schema::{
     Field, IndexRecordOption, Schema, TextFieldIndexing, TextOptions, FAST, INDEXED, STORED,
 };
-use ld_tantivy::{Index, IndexReader, IndexSettings, IndexWriter, ReloadPolicy};
+use ld_lucivy::{Index, IndexReader, IndexSettings, IndexWriter, ReloadPolicy};
 
 use crate::directory::StdFsDirectory;
 use crate::query::SchemaConfig;
@@ -36,7 +36,7 @@ const STEMMED_TOKENIZER: &str = "stemmed";
 const NGRAM_TOKENIZER: &str = "ngram";
 
 /// Opaque handle exposed through the C FFI.
-pub struct TantivyHandle {
+pub struct LucivyHandle {
     pub index: Index,
     pub writer: Mutex<IndexWriter>,
     pub reader: IndexReader,
@@ -74,7 +74,7 @@ fn create_writer(index: &Index) -> Result<IndexWriter, String> {
 /// Config file stored alongside the index for reopening.
 const CONFIG_FILE: &str = "_config.json";
 
-impl TantivyHandle {
+impl LucivyHandle {
     /// Create a new index at the given path.
     pub fn create(path: &str, config: &SchemaConfig) -> Result<Self, String> {
         let (schema, field_map, raw_field_pairs, ngram_field_pairs) = build_schema(config)?;
@@ -234,7 +234,7 @@ fn build_schema(
                 ngram_field_pairs.push((field_def.name.clone(), ngram_name));
             }
             "u64" => {
-                use ld_tantivy::schema::{NumericOptions, FAST, INDEXED};
+                use ld_lucivy::schema::{NumericOptions, FAST, INDEXED};
                 let mut opts = NumericOptions::default();
                 if field_def.stored.unwrap_or(true) {
                     opts = opts | STORED;
@@ -249,7 +249,7 @@ fn build_schema(
                 field_map.push((field_def.name.clone(), field));
             }
             "i64" => {
-                use ld_tantivy::schema::{NumericOptions, FAST, INDEXED};
+                use ld_lucivy::schema::{NumericOptions, FAST, INDEXED};
                 let mut opts = NumericOptions::default();
                 if field_def.stored.unwrap_or(true) {
                     opts = opts | STORED;
@@ -264,7 +264,7 @@ fn build_schema(
                 field_map.push((field_def.name.clone(), field));
             }
             "f64" => {
-                use ld_tantivy::schema::{NumericOptions, FAST, INDEXED};
+                use ld_lucivy::schema::{NumericOptions, FAST, INDEXED};
                 let mut opts = NumericOptions::default();
                 if field_def.stored.unwrap_or(true) {
                     opts = opts | STORED;
@@ -279,7 +279,7 @@ fn build_schema(
                 field_map.push((field_def.name.clone(), field));
             }
             "string" => {
-                use ld_tantivy::schema::STRING;
+                use ld_lucivy::schema::STRING;
                 let opts = if field_def.stored.unwrap_or(true) {
                     STRING | STORED
                 } else {
@@ -306,7 +306,7 @@ fn build_schema(
 }
 
 fn configure_tokenizers(index: &Index, config: &SchemaConfig) {
-    use ld_tantivy::tokenizer::{LowerCaser, SimpleTokenizer, TextAnalyzer};
+    use ld_lucivy::tokenizer::{LowerCaser, SimpleTokenizer, TextAnalyzer};
 
     use crate::tokenizer::NgramFilter;
 
@@ -319,17 +319,17 @@ fn configure_tokenizers(index: &Index, config: &SchemaConfig) {
 
     // Stemmer: only if requested.
     if let Some(ref stemmer_lang) = config.stemmer {
-        use ld_tantivy::tokenizer::Stemmer;
+        use ld_lucivy::tokenizer::Stemmer;
 
         let lang = match stemmer_lang.as_str() {
-            "english" => ld_tantivy::tokenizer::Language::English,
-            "french" => ld_tantivy::tokenizer::Language::French,
-            "german" => ld_tantivy::tokenizer::Language::German,
-            "spanish" => ld_tantivy::tokenizer::Language::Spanish,
-            "italian" => ld_tantivy::tokenizer::Language::Italian,
-            "portuguese" => ld_tantivy::tokenizer::Language::Portuguese,
-            "dutch" => ld_tantivy::tokenizer::Language::Dutch,
-            "russian" => ld_tantivy::tokenizer::Language::Russian,
+            "english" => ld_lucivy::tokenizer::Language::English,
+            "french" => ld_lucivy::tokenizer::Language::French,
+            "german" => ld_lucivy::tokenizer::Language::German,
+            "spanish" => ld_lucivy::tokenizer::Language::Spanish,
+            "italian" => ld_lucivy::tokenizer::Language::Italian,
+            "portuguese" => ld_lucivy::tokenizer::Language::Portuguese,
+            "dutch" => ld_lucivy::tokenizer::Language::Dutch,
+            "russian" => ld_lucivy::tokenizer::Language::Russian,
             _ => return,
         };
 
@@ -366,7 +366,7 @@ mod tests {
     /// Integration test: STRING filter field + contains filter via build_query.
     #[test]
     fn test_string_filter_field_contains() {
-        let tmp = std::env::temp_dir().join("tantivy_test_string_filter_contains");
+        let tmp = std::env::temp_dir().join("lucivy_test_string_filter_contains");
         let _ = std::fs::remove_dir_all(&tmp);
         std::fs::create_dir_all(&tmp).unwrap();
         let path = tmp.to_str().unwrap();
@@ -381,7 +381,7 @@ mod tests {
         let config_str = config_json.to_string();
         let config: SchemaConfig = serde_json::from_str(&config_str).unwrap();
 
-        let handle = TantivyHandle::create(path, &config).unwrap();
+        let handle = LucivyHandle::create(path, &config).unwrap();
 
         // Verify ngram pairs include "tag"
         assert!(
@@ -402,7 +402,7 @@ mod tests {
                 (2, "A guide to cooking Italian food", "cooking"),
                 (3, "C++ is a general-purpose programming language", "systems"),
             ] {
-                let mut doc = ld_tantivy::TantivyDocument::new();
+                let mut doc = ld_lucivy::LucivyDocument::new();
                 doc.add_u64(nid_field, nid);
                 doc.add_text(body_field, body);
                 doc.add_text(tag_field, tag);
@@ -445,7 +445,7 @@ mod tests {
         ).unwrap();
 
         let searcher = handle.reader.searcher();
-        let collector = ld_tantivy::collector::TopDocs::with_limit(10).order_by_score();
+        let collector = ld_lucivy::collector::TopDocs::with_limit(10).order_by_score();
         let results = searcher.search(&*query, &collector).unwrap();
 
         println!("Results for contains 'ystem' filter: {:?}", results);

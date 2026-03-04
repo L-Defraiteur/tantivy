@@ -1,21 +1,21 @@
-//! lucivy — Python bindings for ld-tantivy BM25 full-text search.
+//! lucivy — Python bindings for ld-lucivy BM25 full-text search.
 //!
-//! Provides a Pythonic API for creating, managing, and querying Tantivy indexes.
+//! Provides a Pythonic API for creating, managing, and querying Lucivy indexes.
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use ld_tantivy::collector::{FilterCollector, TopDocs};
-use ld_tantivy::query::HighlightSink;
-use ld_tantivy::schema::{FieldType, Value as TantivyValue};
-use ld_tantivy::{DocAddress, Searcher, TantivyDocument};
+use ld_lucivy::collector::{FilterCollector, TopDocs};
+use ld_lucivy::query::HighlightSink;
+use ld_lucivy::schema::{FieldType, Value as LucivyValue};
+use ld_lucivy::{DocAddress, Searcher, LucivyDocument};
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
-use tantivy_fts::handle::{TantivyHandle, NGRAM_SUFFIX, NODE_ID_FIELD, RAW_SUFFIX};
-use tantivy_fts::query;
+use lucivy_fts::handle::{LucivyHandle, NGRAM_SUFFIX, NODE_ID_FIELD, RAW_SUFFIX};
+use lucivy_fts::query;
 
 // ─── SearchResult ──────────────────────────────────────────────────────────
 
@@ -44,7 +44,7 @@ impl SearchResult {
 
 #[pyclass]
 struct Index {
-    handle: TantivyHandle,
+    handle: LucivyHandle,
     index_path: String,
     /// User field names (excludes _node_id, ._raw, ._ngram).
     user_fields: Vec<(String, String)>, // (name, field_type)
@@ -90,7 +90,7 @@ impl Index {
             stemmer: stemmer.map(String::from),
         };
 
-        let handle = TantivyHandle::create(path, &config)
+        let handle = LucivyHandle::create(path, &config)
             .map_err(|e| PyValueError::new_err(e))?;
 
         let (user_fields, text_fields) = extract_user_fields(&config);
@@ -106,7 +106,7 @@ impl Index {
     /// Open an existing index at the given path.
     #[staticmethod]
     fn open(path: &str) -> PyResult<Self> {
-        let handle = TantivyHandle::open(path)
+        let handle = LucivyHandle::open(path)
             .map_err(|e| PyValueError::new_err(e))?;
 
         // Read config to get user fields.
@@ -135,7 +135,7 @@ impl Index {
     #[pyo3(signature = (doc_id, **kwargs))]
     fn add(&self, doc_id: u64, kwargs: Option<&Bound<'_, PyDict>>) -> PyResult<()> {
         let kwargs = kwargs.ok_or_else(|| PyValueError::new_err("at least one field is required"))?;
-        let mut doc = TantivyDocument::new();
+        let mut doc = LucivyDocument::new();
 
         let nid_field = self.handle.field(NODE_ID_FIELD)
             .ok_or_else(|| PyValueError::new_err("no _node_id field in schema"))?;
@@ -167,7 +167,7 @@ impl Index {
                 .ok_or_else(|| PyValueError::new_err("each doc must have a 'doc_id' key"))?
                 .extract()?;
 
-            let mut doc = TantivyDocument::new();
+            let mut doc = LucivyDocument::new();
             doc.add_u64(nid_field, doc_id);
 
             for (key, value) in dict.iter() {
@@ -186,7 +186,7 @@ impl Index {
     fn delete(&self, doc_id: u64) -> PyResult<()> {
         let field = self.handle.field(NODE_ID_FIELD)
             .ok_or_else(|| PyValueError::new_err("no _node_id field in schema"))?;
-        let term = ld_tantivy::schema::Term::from_field_u64(field, doc_id);
+        let term = ld_lucivy::schema::Term::from_field_u64(field, doc_id);
         let writer = self.handle.writer.lock()
             .map_err(|_| PyValueError::new_err("writer lock poisoned"))?;
         writer.delete_term(term);
@@ -244,7 +244,7 @@ impl Index {
             None
         };
 
-        let tantivy_query = query::build_query(
+        let lucivy_query = query::build_query(
             &query_config,
             &self.handle.schema,
             &self.handle.index,
@@ -257,9 +257,9 @@ impl Index {
         let top_docs = match allowed_ids {
             Some(ids) => {
                 let id_set: HashSet<u64> = ids.into_iter().collect();
-                execute_top_docs_filtered(&searcher, tantivy_query.as_ref(), limit, id_set)?
+                execute_top_docs_filtered(&searcher, lucivy_query.as_ref(), limit, id_set)?
             }
-            None => execute_top_docs(&searcher, tantivy_query.as_ref(), limit)?,
+            None => execute_top_docs(&searcher, lucivy_query.as_ref(), limit)?,
         };
 
         collect_results(&searcher, &top_docs, &self.handle.schema, highlight_sink.as_deref())
@@ -433,8 +433,8 @@ fn extract_user_fields(config: &query::SchemaConfig) -> (Vec<(String, String)>, 
 }
 
 fn add_fields_from_dict(
-    handle: &TantivyHandle,
-    doc: &mut TantivyDocument,
+    handle: &LucivyHandle,
+    doc: &mut LucivyDocument,
     kwargs: &Bound<'_, PyDict>,
 ) -> PyResult<()> {
     for (key, value) in kwargs.iter() {
@@ -445,8 +445,8 @@ fn add_fields_from_dict(
 }
 
 fn add_field_value(
-    handle: &TantivyHandle,
-    doc: &mut TantivyDocument,
+    handle: &LucivyHandle,
+    doc: &mut LucivyDocument,
     field_name: &str,
     value: &Bound<'_, PyAny>,
 ) -> PyResult<()> {
@@ -478,7 +478,7 @@ fn add_field_value(
 }
 
 /// Auto-duplicate text values into ._raw and ._ngram counterparts.
-fn auto_duplicate(handle: &TantivyHandle, doc: &mut TantivyDocument, field_name: &str, text: &str) {
+fn auto_duplicate(handle: &LucivyHandle, doc: &mut LucivyDocument, field_name: &str, text: &str) {
     if let Some(raw_name) = handle.raw_field_pairs.iter()
         .find(|(user, _)| user == field_name)
         .map(|(_, raw)| raw.as_str())
@@ -499,7 +499,7 @@ fn auto_duplicate(handle: &TantivyHandle, doc: &mut TantivyDocument, field_name:
 
 fn execute_top_docs(
     searcher: &Searcher,
-    query: &dyn ld_tantivy::query::Query,
+    query: &dyn ld_lucivy::query::Query,
     limit: u32,
 ) -> PyResult<Vec<(f32, DocAddress)>> {
     let collector = TopDocs::with_limit(limit as usize).order_by_score();
@@ -509,7 +509,7 @@ fn execute_top_docs(
 
 fn execute_top_docs_filtered(
     searcher: &Searcher,
-    query: &dyn ld_tantivy::query::Query,
+    query: &dyn ld_lucivy::query::Query,
     limit: u32,
     allowed_ids: HashSet<u64>,
 ) -> PyResult<Vec<(f32, DocAddress)>> {
@@ -526,7 +526,7 @@ fn execute_top_docs_filtered(
 fn collect_results(
     searcher: &Searcher,
     top_docs: &[(f32, DocAddress)],
-    schema: &ld_tantivy::schema::Schema,
+    schema: &ld_lucivy::schema::Schema,
     highlight_sink: Option<&HighlightSink>,
 ) -> PyResult<Vec<SearchResult>> {
     let nid_field = schema.get_field(NODE_ID_FIELD)
@@ -534,7 +534,7 @@ fn collect_results(
 
     let mut results = Vec::with_capacity(top_docs.len());
     for &(score, doc_addr) in top_docs {
-        let doc: TantivyDocument = searcher.doc(doc_addr)
+        let doc: LucivyDocument = searcher.doc(doc_addr)
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
         let doc_id = doc.get_first(nid_field)
             .and_then(|v| v.as_value().as_u64())

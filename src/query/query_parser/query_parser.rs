@@ -128,7 +128,7 @@ fn trim_ast(logical_ast: LogicalAst) -> Option<LogicalAst> {
     }
 }
 
-/// Tantivy's Query parser
+/// Lucivy's Query parser
 ///
 /// The language covered by the current parser is extremely simple.
 ///
@@ -701,8 +701,8 @@ impl QueryParser {
     /// Given a literal, returns the list of terms that should be searched.
     ///
     /// The terms are identified by a triplet:
-    /// - tantivy field
-    /// - field_path: tantivy has JSON fields. It is possible to target a member of a JSON object by
+    /// - lucivy field
+    /// - field_path: lucivy has JSON fields. It is possible to target a member of a JSON object by
     ///   naturally extending the json field name with a "." separated field_path
     /// - field_phrase: the phrase that is being searched.
     ///
@@ -715,7 +715,7 @@ impl QueryParser {
     /// should `one.two:three` target `one.two` with field path `` or or `one` with
     /// the field path `two`.
     ///
-    /// In this case tantivy, just picks the solution with the longest field name.
+    /// In this case lucivy, just picks the solution with the longest field name.
     ///
     /// Quirk: As a hack for quickwit, we do not split over a dot that appear escaped '\.'.
     fn compute_path_triplets_for_literal<'a>(

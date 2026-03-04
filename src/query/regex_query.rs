@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use tantivy_fst::Regex;
 
-use crate::error::TantivyError;
+use crate::error::LucivyError;
 use crate::query::phrase_query::scoring_utils::HighlightSink;
 use crate::query::{AutomatonWeight, EnableScoring, Query, Weight};
 use crate::schema::Field;
@@ -16,12 +16,12 @@ use crate::schema::Field;
 /// by converting them to their regex counterparts.
 ///
 /// ```rust
-/// use tantivy::collector::Count;
-/// use tantivy::query::RegexQuery;
-/// use tantivy::schema::{Schema, TEXT};
-/// use tantivy::{doc, Index, IndexWriter, Term};
+/// use lucivy::collector::Count;
+/// use lucivy::query::RegexQuery;
+/// use lucivy::schema::{Schema, TEXT};
+/// use lucivy::{doc, Index, IndexWriter, Term};
 ///
-/// # fn test() -> tantivy::Result<()> {
+/// # fn test() -> lucivy::Result<()> {
 /// let mut schema_builder = Schema::builder();
 /// let title = schema_builder.add_text_field("title", TEXT);
 /// let schema = schema_builder.build();
@@ -66,7 +66,7 @@ impl RegexQuery {
     /// Creates a new RegexQuery from a given pattern
     pub fn from_pattern(regex_pattern: &str, field: Field) -> crate::Result<Self> {
         let regex = Regex::new(regex_pattern)
-            .map_err(|err| TantivyError::InvalidArgument(format!("RegexQueryError: {err}")))?;
+            .map_err(|err| LucivyError::InvalidArgument(format!("RegexQueryError: {err}")))?;
         Ok(RegexQuery::from_regex(regex, field))
     }
 
@@ -203,7 +203,7 @@ mod test {
         let (_reader, field) = build_test_index().unwrap();
 
         match RegexQuery::from_pattern(r"(foo", field) {
-            Err(crate::TantivyError::InvalidArgument(msg)) => {
+            Err(crate::LucivyError::InvalidArgument(msg)) => {
                 assert!(msg.contains("error: unclosed group"))
             }
             res => panic!("unexpected result: {res:?}"),

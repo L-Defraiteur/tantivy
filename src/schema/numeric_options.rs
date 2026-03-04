@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use super::flags::CoerceFlag;
 use crate::schema::flags::{FastFlag, IndexedFlag, SchemaFlagList, StoredFlag};
 
-/// Define how an `u64`, `i64`, or `f64` field should be handled by tantivy.
+/// Define how an `u64`, `i64`, or `f64` field should be handled by lucivy.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(from = "NumericOptionsDeser")]
 pub struct NumericOptions {
@@ -92,7 +92,7 @@ impl NumericOptions {
     /// Set the field as stored.
     ///
     /// Only the fields that are set as *stored* are
-    /// persisted into the Tantivy's store.
+    /// persisted into the Lucivy's store.
     #[must_use]
     pub fn set_stored(mut self) -> NumericOptions {
         self.stored = true;

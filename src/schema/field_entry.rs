@@ -211,7 +211,7 @@ mod tests {
         index_writer.commit()?;
         let searcher = index.reader()?.searcher();
         let err = searcher.segment_reader(0u32).get_fieldnorms_reader(text);
-        assert!(matches!(err, Err(crate::TantivyError::SchemaError(_))));
+        assert!(matches!(err, Err(crate::LucivyError::SchemaError(_))));
         Ok(())
     }
 }

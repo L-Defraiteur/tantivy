@@ -1,7 +1,7 @@
 use regex::Regex;
 
 use super::{Token, TokenStream, Tokenizer};
-use crate::TantivyError;
+use crate::LucivyError;
 
 /// Tokenize the text by using a regex pattern to split.
 ///
@@ -21,7 +21,7 @@ use crate::TantivyError;
 /// # Example
 ///
 /// ```rust
-/// use tantivy::tokenizer::*;
+/// use lucivy::tokenizer::*;
 ///
 /// let mut tokenizer = RegexTokenizer::new(r"'(?:\w*)'").unwrap();
 /// let mut stream = tokenizer.token_stream("'aaa' bbb 'ccc' 'ddd'");
@@ -56,7 +56,7 @@ impl RegexTokenizer {
     /// Creates a new RegexTokenizer.
     pub fn new(regex_pattern: &str) -> crate::Result<RegexTokenizer> {
         Regex::new(regex_pattern)
-            .map_err(|_| TantivyError::InvalidArgument(regex_pattern.to_owned()))
+            .map_err(|_| LucivyError::InvalidArgument(regex_pattern.to_owned()))
             .map(|regex| Self {
                 regex,
                 token: Token::default(),

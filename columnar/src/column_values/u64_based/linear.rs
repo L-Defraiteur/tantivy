@@ -1,7 +1,7 @@
 use std::io;
 
 use common::{BinarySerializable, OwnedBytes};
-use tantivy_bitpacker::{BitPacker, BitUnpacker, compute_num_bits};
+use lucivy_bitpacker::{BitPacker, BitUnpacker, compute_num_bits};
 
 use super::ColumnValues;
 use super::line::Line;

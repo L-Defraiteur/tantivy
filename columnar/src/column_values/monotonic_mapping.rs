@@ -173,7 +173,7 @@ impl MonotonicallyMappableToU64 for RowId {
 }
 
 // TODO remove me.
-// Tantivy should refuse NaN values and work with NotNaN internally.
+// Lucivy should refuse NaN values and work with NotNaN internally.
 impl MonotonicallyMappableToU64 for f64 {
     #[inline(always)]
     fn to_u64(self) -> u64 {

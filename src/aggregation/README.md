@@ -6,7 +6,7 @@ When adding new bucket aggregation make sure to extend the "test_aggregation_flu
 
 # Code Organization
 
-Tantivy's aggregations have been designed to mimic the 
+Lucivy's aggregations have been designed to mimic the 
 [aggregations of elasticsearch](https://www.elastic.co/guide/en/elasticsearch/reference/current/search-aggregations.html).
 
 The code is organized in submodules:

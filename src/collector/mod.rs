@@ -1,7 +1,7 @@
 //! # Collectors
 //!
 //! Collectors define the information you want to extract from the documents matching the queries.
-//! In tantivy jargon, we call this information your search "fruit".
+//! In lucivy jargon, we call this information your search "fruit".
 //!
 //! Your fruit could for instance be :
 //! - [the count of matching documents](crate::collector::Count)
@@ -34,12 +34,12 @@
 //! in their respective position.
 //!
 //! ```rust
-//! # use tantivy::schema::*;
-//! # use tantivy::*;
-//! # use tantivy::query::*;
-//! use tantivy::collector::{Count, TopDocs};
+//! # use lucivy::schema::*;
+//! # use lucivy::*;
+//! # use lucivy::query::*;
+//! use lucivy::collector::{Count, TopDocs};
 //! #
-//! # fn main() -> tantivy::Result<()> {
+//! # fn main() -> lucivy::Result<()> {
 //! # let mut schema_builder = Schema::builder();
 //! #     let title = schema_builder.add_text_field("title", TEXT);
 //! #     let schema = schema_builder.build();

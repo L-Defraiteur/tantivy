@@ -59,7 +59,7 @@ impl BinarySerializable for DocStoreVersion {
     }
 }
 
-/// Reads document off tantivy's [`Store`](./index.html)
+/// Reads document off lucivy's [`Store`](./index.html)
 pub struct StoreReader {
     decompressor: Decompressor,
     doc_store_version: DocStoreVersion,
@@ -223,7 +223,7 @@ impl StoreReader {
     /// Advanced API. In most cases use [`get`](Self::get).
     fn block_checkpoint(&self, doc_id: DocId) -> crate::Result<Checkpoint> {
         self.skip_index.seek(doc_id).ok_or_else(|| {
-            crate::TantivyError::InvalidArgument(format!("Failed to lookup Doc #{doc_id}."))
+            crate::LucivyError::InvalidArgument(format!("Failed to lookup Doc #{doc_id}."))
         })
     }
 
@@ -268,8 +268,8 @@ impl StoreReader {
 
         let deserializer =
             BinaryDocumentDeserializer::from_reader(&mut doc_bytes, self.doc_store_version)
-                .map_err(crate::TantivyError::from)?;
-        D::deserialize(deserializer).map_err(crate::TantivyError::from)
+                .map_err(crate::LucivyError::from)?;
+        D::deserialize(deserializer).map_err(crate::LucivyError::from)
     }
 
     /// Returns raw bytes of a given document.
@@ -310,8 +310,8 @@ impl StoreReader {
 
             let deserializer =
                 BinaryDocumentDeserializer::from_reader(&mut doc_bytes, self.doc_store_version)
-                    .map_err(crate::TantivyError::from)?;
-            D::deserialize(deserializer).map_err(crate::TantivyError::from)
+                    .map_err(crate::LucivyError::from)?;
+            D::deserialize(deserializer).map_err(crate::LucivyError::from)
         })
     }
 
@@ -389,7 +389,7 @@ fn block_read_index(block: &[u8], doc_pos: u32) -> crate::Result<Range<usize>> {
     let index_len = u32::deserialize(&mut &block[index_len_pos..])? as usize;
 
     if doc_pos > index_len {
-        return Err(crate::TantivyError::InternalError(
+        return Err(crate::LucivyError::InternalError(
             "Attempted to read doc from wrong block".to_owned(),
         ));
     }
@@ -460,8 +460,8 @@ impl StoreReader {
 
         let deserializer =
             BinaryDocumentDeserializer::from_reader(&mut doc_bytes, self.doc_store_version)
-                .map_err(crate::TantivyError::from)?;
-        D::deserialize(deserializer).map_err(crate::TantivyError::from)
+                .map_err(crate::LucivyError::from)?;
+        D::deserialize(deserializer).map_err(crate::LucivyError::from)
     }
 }
 
@@ -471,14 +471,14 @@ mod tests {
 
     use super::*;
     use crate::directory::RamDirectory;
-    use crate::schema::{Field, TantivyDocument, Value};
+    use crate::schema::{Field, LucivyDocument, Value};
     use crate::store::tests::write_lorem_ipsum_store;
     use crate::store::Compressor;
     use crate::Directory;
 
     const BLOCK_SIZE: usize = 16_384;
 
-    fn get_text_field<'a>(doc: &'a TantivyDocument, field: &'a Field) -> Option<&'a str> {
+    fn get_text_field<'a>(doc: &'a LucivyDocument, field: &'a Field) -> Option<&'a str> {
         doc.get_first(*field).and_then(|f| f.as_value().as_str())
     }
 

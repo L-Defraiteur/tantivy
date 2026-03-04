@@ -1,5 +1,5 @@
 /// The tokenizer module contains all of the tools used to process
-/// text in `tantivy`.
+/// text in `lucivy`.
 use tokenizer_api::{BoxTokenStream, TokenFilter, Tokenizer};
 
 use crate::tokenizer::empty_tokenizer::EmptyTokenizer;
@@ -81,7 +81,7 @@ impl<T: Tokenizer> TextAnalyzerBuilder<T> {
     /// # Example
     ///
     /// ```rust
-    /// use tantivy::tokenizer::*;
+    /// use lucivy::tokenizer::*;
     ///
     /// let en_stem = TextAnalyzer::builder(SimpleTokenizer::default())
     ///     .filter(RemoveLongFilter::limit(40))

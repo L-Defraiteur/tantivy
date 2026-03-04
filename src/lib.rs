@@ -1,4 +1,4 @@
-#![doc(html_logo_url = "http://fulmicoton.com/tantivy-logo/tantivy-logo.png")]
+#![doc(html_logo_url = "http://fulmicoton.com/lucivy-logo/lucivy-logo.png")]
 #![cfg_attr(all(feature = "unstable", test), feature(test))]
 #![doc(test(attr(allow(unused_variables), deny(warnings))))]
 #![warn(missing_docs)]
@@ -10,19 +10,19 @@
     clippy::bool_assert_comparison
 )]
 
-//! # `tantivy`
+//! # `lucivy`
 //!
-//! Tantivy is a search engine library.
+//! Lucivy is a search engine library.
 //! Think `Lucene`, but in Rust.
 //!
 //! ```rust
 //! # use std::path::Path;
 //! # use std::fs;
 //! # use tempfile::TempDir;
-//! # use tantivy::collector::TopDocs;
-//! # use tantivy::query::QueryParser;
-//! # use tantivy::schema::*;
-//! # use tantivy::{doc, DocAddress, Index, IndexWriter, Score};
+//! # use lucivy::collector::TopDocs;
+//! # use lucivy::query::QueryParser;
+//! # use lucivy::schema::*;
+//! # use lucivy::{doc, DocAddress, Index, IndexWriter, Score};
 //! #
 //! # fn main() {
 //! #     // Let's create a temporary directory for the
@@ -36,7 +36,7 @@
 //! #     }
 //! # }
 //! #
-//! # fn run_example(index_path: &Path) -> tantivy::Result<()> {
+//! # fn run_example(index_path: &Path) -> lucivy::Result<()> {
 //! // First we need to define a schema ...
 //!
 //! // `TEXT` means the field should be tokenized and indexed,
@@ -93,7 +93,7 @@
 //!
 //! for (_score, doc_address) in top_docs {
 //!     // Retrieve the actual content of documents given its `doc_address`.
-//!     let retrieved_doc = searcher.doc::<TantivyDocument>(doc_address)?;
+//!     let retrieved_doc = searcher.doc::<LucivyDocument>(doc_address)?;
 //!     println!("{}", retrieved_doc.to_json(&schema));
 //! }
 //!
@@ -105,19 +105,19 @@
 //!
 //! A good place for you to get started is to check out
 //! the example code (
-//! [literate programming](https://tantivy-search.github.io/examples/basic_search.html) /
+//! [literate programming](https://lucivy-search.github.io/examples/basic_search.html) /
 //! [source code](https://github.com/quickwit-oss/tantivy/blob/main/examples/basic_search.rs))
 //!
-//! # Tantivy Architecture Overview
+//! # Lucivy Architecture Overview
 //!
-//! Tantivy is inspired by Lucene, the Architecture is very similar.
+//! Lucivy is inspired by Lucene, the Architecture is very similar.
 //!
 //! ## Core Concepts
 //!
-//! - **[Index]**: A collection of segments. The top level entry point for tantivy users to search
+//! - **[Index]**: A collection of segments. The top level entry point for lucivy users to search
 //!   and index data.
 //!
-//! - **[Segment]**: At the heart of Tantivy's indexing structure is the [Segment]. It contains
+//! - **[Segment]**: At the heart of Lucivy's indexing structure is the [Segment]. It contains
 //!   documents and indices and is the atomic unit of indexing and search.
 //!
 //! - **[Schema](schema)**: A schema is a set of fields in an index. Each field has a specific data
@@ -172,14 +172,14 @@ mod future_result;
 pub use common::{ByteCount, DateTime};
 pub use {columnar, query_grammar, time};
 
-pub use crate::error::TantivyError;
+pub use crate::error::LucivyError;
 pub use crate::future_result::FutureResult;
 
-/// Tantivy result.
+/// Lucivy result.
 ///
-/// Within tantivy, please avoid importing `Result` using `use crate::Result`
+/// Within lucivy, please avoid importing `Result` using `use crate::Result`
 /// and instead, refer to this as `crate::Result<T>`.
-pub type Result<T> = std::result::Result<T, TantivyError>;
+pub type Result<T> = std::result::Result<T, LucivyError>;
 
 mod core;
 pub mod indexer;
@@ -228,11 +228,11 @@ pub use crate::index::{
     SegmentMeta, SegmentReader,
 };
 pub use crate::indexer::{IndexWriter, SingleSegmentIndexWriter};
-pub use crate::schema::{Document, TantivyDocument, Term};
+pub use crate::schema::{Document, LucivyDocument, Term};
 
 /// Index format version.
 pub const INDEX_FORMAT_VERSION: u32 = 7;
-/// Oldest index format version this tantivy version can read.
+/// Oldest index format version this lucivy version can read.
 pub const INDEX_FORMAT_OLDEST_SUPPORTED_VERSION: u32 = 4;
 
 /// Structure version for the index.
@@ -261,7 +261,7 @@ impl fmt::Display for Version {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "tantivy v{}.{}.{}, index_format v{}",
+            "lucivy v{}.{}.{}, index_format v{}",
             self.major, self.minor, self.patch, self.index_format_version
         )
     }
@@ -269,19 +269,19 @@ impl fmt::Display for Version {
 
 static VERSION_STRING: Lazy<String> = Lazy::new(|| VERSION.to_string());
 
-/// Expose the current version of tantivy as found in Cargo.toml during compilation.
+/// Expose the current version of lucivy as found in Cargo.toml during compilation.
 /// eg. "0.11.0" as well as the compression scheme used in the docstore.
 pub fn version() -> &'static Version {
     &VERSION
 }
 
-/// Exposes the complete version of tantivy as found in Cargo.toml during compilation as a string.
-/// eg. "tantivy v0.11.0, index_format v1, store_compression: lz4".
+/// Exposes the complete version of lucivy as found in Cargo.toml during compilation as a string.
+/// eg. "lucivy v0.11.0, index_format v1, store_compression: lz4".
 pub fn version_string() -> &'static str {
     VERSION_STRING.as_str()
 }
 
-/// Defines tantivy's merging strategy
+/// Defines lucivy's merging strategy
 pub mod merge_policy {
     pub use crate::indexer::{
         DefaultMergePolicy, LogMergePolicy, MergeCandidate, MergePolicy, NoMergePolicy,
@@ -452,7 +452,7 @@ pub mod tests {
     fn test_version_string() {
         use regex::Regex;
         let regex_ptn = Regex::new(
-            "tantivy v[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.{0,10}, index_format v[0-9]{1,5}",
+            "lucivy v[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.{0,10}, index_format v[0-9]{1,5}",
         )
         .unwrap();
         let version = super::version().to_string();
@@ -1034,13 +1034,13 @@ pub mod tests {
         let mut schema_builder = Schema::builder();
         let text_field = schema_builder.add_text_field("text", TEXT);
         let other_text_field = schema_builder.add_text_field("text2", TEXT);
-        let document = doc!(text_field => "tantivy",
+        let document = doc!(text_field => "lucivy",
                             text_field => "some other value",
                             other_text_field => "short");
         assert_eq!(document.len(), 3);
         let values: Vec<OwnedValue> = document.get_all(text_field).map(OwnedValue::from).collect();
         assert_eq!(values.len(), 2);
-        assert_eq!(values[0].as_ref().as_str(), Some("tantivy"));
+        assert_eq!(values[0].as_ref().as_str(), Some("lucivy"));
         assert_eq!(values[1].as_ref().as_str(), Some("some other value"));
         let values: Vec<OwnedValue> = document
             .get_all(other_text_field)
@@ -1236,21 +1236,21 @@ pub mod tests {
         let index = Index::create_in_ram(schema);
         let mut index_writer = index.writer_for_tests().unwrap();
         {
-            let mut doc = TantivyDocument::new();
+            let mut doc = LucivyDocument::new();
             let mut obj = BTreeMap::default();
             obj.insert("key".to_string(), OwnedValue::I64(1i64));
             doc.add_object(json_field, obj);
             index_writer.add_document(doc).unwrap();
         }
         {
-            let mut doc = TantivyDocument::new();
+            let mut doc = LucivyDocument::new();
             let mut obj = BTreeMap::default();
             obj.insert("key".to_string(), OwnedValue::U64(1u64));
             doc.add_object(json_field, obj);
             index_writer.add_document(doc).unwrap();
         }
         {
-            let mut doc = TantivyDocument::new();
+            let mut doc = LucivyDocument::new();
             let mut obj = BTreeMap::default();
             obj.insert("key".to_string(), OwnedValue::F64(1.0f64));
             doc.add_object(json_field, obj);

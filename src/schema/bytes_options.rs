@@ -3,7 +3,7 @@ use std::ops::BitOr;
 use serde::{Deserialize, Serialize};
 
 use super::flags::{FastFlag, IndexedFlag, SchemaFlagList, StoredFlag};
-/// Define how a bytes field should be handled by tantivy.
+/// Define how a bytes field should be handled by lucivy.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(from = "BytesOptionsDeser")]
 pub struct BytesOptions {
@@ -95,7 +95,7 @@ impl BytesOptions {
     /// Set the field as stored.
     ///
     /// Only the fields that are set as *stored* are
-    /// persisted into the Tantivy's store.
+    /// persisted into the Lucivy's store.
     #[must_use]
     pub fn set_stored(mut self) -> BytesOptions {
         self.stored = true;

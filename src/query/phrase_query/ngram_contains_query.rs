@@ -26,7 +26,7 @@ use crate::query::bm25::Bm25Weight;
 use crate::query::{EmptyScorer, EnableScoring, Explanation, Query, Scorer, Weight};
 use crate::schema::document::Value;
 use crate::schema::{Field, IndexRecordOption, Term};
-use crate::{DocId, DocSet, InvertedIndexReader, Score, SegmentReader, TantivyDocument, TERMINATED};
+use crate::{DocId, DocSet, InvertedIndexReader, Score, SegmentReader, LucivyDocument, TERMINATED};
 
 // ─── Candidate Collection ──────────────────────────────────────────────────
 
@@ -297,7 +297,7 @@ impl Weight for NgramContainsWeight {
         // Create scorer that verifies each candidate via stored text.
         let store_reader = reader
             .get_store_reader(50)
-            .map_err(crate::TantivyError::from)?;
+            .map_err(crate::LucivyError::from)?;
         let text_field = self.stored_field.unwrap_or(self.raw_field);
 
         let fieldnorm_reader = if let Some(fnr) = reader
@@ -325,7 +325,7 @@ impl Weight for NgramContainsWeight {
     fn explain(&self, reader: &SegmentReader, doc: DocId) -> crate::Result<Explanation> {
         let mut scorer = self.scorer(reader, 1.0)?;
         if scorer.seek(doc) != doc {
-            return Err(crate::TantivyError::InvalidArgument(format!(
+            return Err(crate::LucivyError::InvalidArgument(format!(
                 "Document {doc} does not match"
             )));
         }
@@ -670,7 +670,7 @@ impl NgramContainsScorer {
             return false;
         }
 
-        let doc: TantivyDocument = match self.store_reader.get(doc_id) {
+        let doc: LucivyDocument = match self.store_reader.get(doc_id) {
             Ok(d) => d,
             Err(_) => return false,
         };

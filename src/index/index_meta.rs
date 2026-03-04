@@ -107,8 +107,8 @@ impl SegmentMeta {
     /// are required for the segment meta.
     /// Note: Some of the returned files may not exist depending on the state of the segment.
     ///
-    /// This is useful as the way tantivy removes files
-    /// is by removing all files that have been created by tantivy
+    /// This is useful as the way lucivy removes files
+    /// is by removing all files that have been created by lucivy
     /// and are not used by any segment anymore.
     pub fn list_files(&self) -> HashSet<PathBuf> {
         if self
@@ -318,7 +318,7 @@ pub struct IndexMeta {
     ///
     /// Upon commit, clients can optionally add a small `String` payload to their commit
     /// to help identify this commit.
-    /// This payload is entirely unused by tantivy.
+    /// This payload is entirely unused by lucivy.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub payload: Option<String>,
 }
@@ -489,7 +489,7 @@ mod tests {
         let err = serde_json::from_str::<UntrackedIndexMeta>(json).unwrap_err();
         assert_eq!(
             err.to_string(),
-            "unsupported variant `zstd`, please enable Tantivy's `zstd-compression` feature at \
+            "unsupported variant `zstd`, please enable Lucivy's `zstd-compression` feature at \
              line 1 column 48"
                 .to_string()
         );

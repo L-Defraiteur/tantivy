@@ -45,7 +45,7 @@ use crate::{DocId, Score};
 /// Within a term, documents have to be pushed in increasing order.
 ///
 /// A description of the serialization format is
-/// [available here](https://fulmicoton.gitbooks.io/tantivy-doc/content/inverted-index.html).
+/// [available here](https://fulmicoton.gitbooks.io/lucivy-doc/content/inverted-index.html).
 pub struct InvertedIndexSerializer {
     terms_write: CompositeWrite<WritePtr>,
     postings_write: CompositeWrite<WritePtr>,

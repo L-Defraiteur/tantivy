@@ -110,7 +110,7 @@ pub trait Value<'a>: Send + Sync + Debug {
     }
 }
 
-/// A enum representing a leaf value for tantivy to index.
+/// A enum representing a leaf value for lucivy to index.
 #[derive(Clone, Debug, PartialEq)]
 pub enum ReferenceValueLeaf<'a> {
     /// A null value.
@@ -333,7 +333,7 @@ impl<'a> ReferenceValueLeaf<'a> {
     }
 }
 
-/// A enum representing a value for tantivy to index.
+/// A enum representing a value for lucivy to index.
 #[derive(Clone, Debug, PartialEq)]
 pub enum ReferenceValue<'a, V>
 where V: Value<'a> + ?Sized

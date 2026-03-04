@@ -37,7 +37,7 @@ pub(crate) fn get_missing_val_as_u64_lenient(
             f64_to_fastfield_u64(*val as f64, &column_type)
         }
         _ => {
-            return Err(crate::TantivyError::InvalidArgument(format!(
+            return Err(crate::LucivyError::InvalidArgument(format!(
                 "Missing value {missing:?} for field {field_name} is not supported for column \
                  type {column_type:?}"
             )));

@@ -1,4 +1,4 @@
-use tantivy_stacker::ArenaHashMap;
+use lucivy_stacker::ArenaHashMap;
 
 const ALICE: &str = include_str!("../../benches/alice.txt");
 

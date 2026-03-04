@@ -1,10 +1,10 @@
 [package]
-name = "ld-tantivy-common"
+name = "ld-lucivy-common"
 version = "0.26.0"
 authors = ["Paul Masurel <paul@quickwit.io>", "Pascal Seitz <pascal@quickwit.io>"]
 license = "MIT"
 edition = "2024"
-description = "common traits and utility functions used by multiple tantivy subcrates"
+description = "common traits and utility functions used by multiple lucivy subcrates"
 documentation = "https://docs.rs/tantivy_common/"
 homepage = "https://github.com/quickwit-oss/tantivy"
 repository = "https://github.com/quickwit-oss/tantivy"

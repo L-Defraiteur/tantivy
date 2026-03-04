@@ -74,7 +74,7 @@ pub enum OpenWriteError {
     IoError {
         /// The underlying `io::Error`.
         io_error: Arc<io::Error>,
-        /// File path of the file that tantivy failed to open for write.
+        /// File path of the file that lucivy failed to open for write.
         filepath: PathBuf,
     },
 }
@@ -94,7 +94,7 @@ impl OpenWriteError {
 pub enum Incompatibility {
     /// This library cannot decompress the index found on disk
     CompressionMismatch {
-        /// Compression algorithm used by the current version of tantivy
+        /// Compression algorithm used by the current version of lucivy
         library_compression_format: String,
         /// Compression algorithm that was used to serialise the index
         index_compression_format: String,
@@ -136,7 +136,7 @@ impl fmt::Debug for Incompatibility {
                 // TODO make a more useful error message
                 // include the version range that supports this index_format_version
                 let advice = format!(
-                    "Change tantivy to a version compatible with index format {} (e.g. {}.{}.x) \
+                    "Change lucivy to a version compatible with index format {} (e.g. {}.{}.x) \
                      and rebuild your project.",
                     index_version.index_format_version, index_version.major, index_version.minor
                 );
@@ -161,7 +161,7 @@ pub enum OpenReadError {
     IoError {
         /// The underlying `io::Error`.
         io_error: Arc<io::Error>,
-        /// File path of the file that tantivy failed to open for read.
+        /// File path of the file that lucivy failed to open for read.
         filepath: PathBuf,
     },
     /// This library does not support the index version found in file footer.
@@ -190,7 +190,7 @@ pub enum DeleteError {
     IoError {
         /// The underlying `io::Error`.
         io_error: Arc<io::Error>,
-        /// File path of the file that tantivy failed to delete.
+        /// File path of the file that lucivy failed to delete.
         filepath: PathBuf,
     },
 }

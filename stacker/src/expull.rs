@@ -9,7 +9,7 @@ const FIRST_BLOCK_NUM: u32 = 2;
 
 /// An exponential unrolled link.
 ///
-/// The use case is as follows. Tantivy's indexer conceptually acts like a
+/// The use case is as follows. Lucivy's indexer conceptually acts like a
 /// `HashMap<Term, Vec<u32>>`. As we come across a given term in document
 /// `D`, we lookup the term in the map and append the document id to its vector.
 ///

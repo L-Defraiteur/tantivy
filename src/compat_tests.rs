@@ -77,7 +77,7 @@ fn assert_date_time_precision(index: &Index, doc_store_precision: DateTimePrecis
     assert_eq!(top_docs.len(), 1, "Expected 1 search result");
 
     let doc_address = top_docs[0].1;
-    let retrieved_doc: TantivyDocument = searcher
+    let retrieved_doc: LucivyDocument = searcher
         .doc(doc_address)
         .expect("Failed to retrieve document");
 

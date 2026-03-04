@@ -8,7 +8,7 @@ use crate::schema::{Field, IndexRecordOption, Schema, INDEXED, STRING, TEXT};
 use crate::tokenizer::TokenizerManager;
 use crate::{
     Directory, DocSet, Index, IndexBuilder, IndexReader, IndexSettings, IndexWriter, ReloadPolicy,
-    TantivyDocument, Term,
+    LucivyDocument, Term,
 };
 
 #[test]
@@ -318,13 +318,13 @@ fn test_merging_segment_update_docfreq() {
     writer
         .add_document(doc!(text_field=>"hello", id_field=>"TO_BE_DELETED"))
         .unwrap();
-    writer.add_document(TantivyDocument::default()).unwrap();
+    writer.add_document(LucivyDocument::default()).unwrap();
     writer.commit().unwrap();
     for _ in 0..7 {
         writer.add_document(doc!(text_field=>"hello")).unwrap();
     }
-    writer.add_document(TantivyDocument::default()).unwrap();
-    writer.add_document(TantivyDocument::default()).unwrap();
+    writer.add_document(LucivyDocument::default()).unwrap();
+    writer.add_document(LucivyDocument::default()).unwrap();
     writer.delete_term(Term::from_field_text(id_field, "TO_BE_DELETED"));
     writer.commit().unwrap();
 
@@ -360,7 +360,7 @@ fn test_positions_merge_bug_non_text_json_vint() {
     // Here a string would work.
     let doc_json = r#"{"tenant_id":75}"#;
     let vals = serde_json::from_str(doc_json).unwrap();
-    let mut doc = TantivyDocument::default();
+    let mut doc = LucivyDocument::default();
     doc.add_object(field, vals);
     writer.add_document(doc.clone()).unwrap();
     writer.commit().unwrap();
@@ -385,7 +385,7 @@ fn test_positions_merge_bug_non_text_json_bitpacked_block() {
     // Here a string would work.
     let doc_json = r#"{"tenant_id":75}"#;
     let vals = serde_json::from_str(doc_json).unwrap();
-    let mut doc = TantivyDocument::default();
+    let mut doc = LucivyDocument::default();
     doc.add_object(field, vals);
     for _ in 0..128 {
         writer.add_document(doc.clone()).unwrap();
@@ -408,7 +408,7 @@ fn test_non_text_json_term_freq() {
     // Here a string would work.
     let doc_json = r#"{"tenant_id":75}"#;
     let vals = serde_json::from_str(doc_json).unwrap();
-    let mut doc = TantivyDocument::default();
+    let mut doc = LucivyDocument::default();
     doc.add_object(field, vals);
     writer.add_document(doc.clone()).unwrap();
     writer.commit().unwrap();
@@ -439,7 +439,7 @@ fn test_non_text_json_term_freq_bitpacked() {
     // Here a string would work.
     let doc_json = r#"{"tenant_id":75}"#;
     let vals = serde_json::from_str(doc_json).unwrap();
-    let mut doc = TantivyDocument::default();
+    let mut doc = LucivyDocument::default();
     doc.add_object(field, vals);
     let num_docs = 132;
     for _ in 0..num_docs {

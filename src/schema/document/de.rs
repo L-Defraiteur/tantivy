@@ -285,7 +285,7 @@ pub trait ObjectAccess<'de> {
     fn next_entry<V: ValueDeserialize>(&mut self) -> Result<Option<(String, V)>, DeserializeError>;
 }
 
-/// The document deserializer used to read the tantivy documents serialized with
+/// The document deserializer used to read the lucivy documents serialized with
 /// `BinarySerializable`.
 ///
 /// This acts very similarly to serde's deserialize types and can incrementally

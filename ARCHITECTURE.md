@@ -1,22 +1,22 @@
-# Tantivy
+# Lucivy
 
-## What is tantivy?
+## What is lucivy?
 
-Tantivy is a library that is meant to build search engines. Although it is by no means a port of Lucene, its architecture is strongly inspired by it. If you are familiar with Lucene, you may be struck by the overlapping vocabulary.
+Lucivy is a library that is meant to build search engines. Although it is by no means a port of Lucene, its architecture is strongly inspired by it. If you are familiar with Lucene, you may be struck by the overlapping vocabulary.
 This is not fortuitous.
 
-Tantivy's bread and butter is to address the problem of full-text search :
+Lucivy's bread and butter is to address the problem of full-text search :
 
-Given a large set of textual documents, and a text query, return the K-most relevant documents in a very efficient way. To execute these queries rapidly, the tantivy needs to build an index beforehand. The relevance score implemented in the tantivy is not configurable. Tantivy uses the same score as the default similarity used in Lucene / Elasticsearch, called [BM25](https://en.wikipedia.org/wiki/Okapi_BM25).
+Given a large set of textual documents, and a text query, return the K-most relevant documents in a very efficient way. To execute these queries rapidly, the lucivy needs to build an index beforehand. The relevance score implemented in the lucivy is not configurable. Lucivy uses the same score as the default similarity used in Lucene / Elasticsearch, called [BM25](https://en.wikipedia.org/wiki/Okapi_BM25).
 
-But tantivy's scope does not stop there. Numerous features are required to power rich-search applications. For instance, one may want to:
+But lucivy's scope does not stop there. Numerous features are required to power rich-search applications. For instance, one may want to:
 
 - compute the count of documents matching a query in the different section of an e-commerce website,
 - display an average price per meter square for a real estate search engine,
 - take into account historical user data to rank documents in a specific way,
-- or even use tantivy to power an OLAP database.
+- or even use lucivy to power an OLAP database.
 
-A more abstract description of the problem space tantivy is trying to address is the following.
+A more abstract description of the problem space lucivy is trying to address is the following.
 
 Ingest a large set of documents, create an index that makes it possible to
 rapidly select all documents matching a given predicate (also known as a query) and
@@ -28,17 +28,17 @@ Roughly speaking the design is following these guiding principles:
 - Indexing should be O(1) in memory. (In practice it is just sublinear)
 - Search should be as fast as possible
 
-This comes at the cost of the dynamicity of the index: while it is possible to add, and delete documents from our corpus, the tantivy is designed to handle these updates in large batches.
+This comes at the cost of the dynamicity of the index: while it is possible to add, and delete documents from our corpus, the lucivy is designed to handle these updates in large batches.
 
 ## [core/](src/core): Index, segments, searchers
 
 Core contains all of the high-level code to make it possible to create an index, add documents, delete documents and commit.
 
-This is both the most high-level part of tantivy, the least performance-sensitive one, the seemingly most mundane code... And paradoxically the most complicated part.
+This is both the most high-level part of lucivy, the least performance-sensitive one, the seemingly most mundane code... And paradoxically the most complicated part.
 
 ### Index and Segments
 
-A tantivy index is a collection of smaller independent immutable segments.
+A lucivy index is a collection of smaller independent immutable segments.
 Each segment contains its own independent set of data structures.
 
 A segment is identified by a segment id that is in fact a UUID.
@@ -52,13 +52,13 @@ A small `meta.json` file is in charge of keeping track of the list of segments, 
 
 On commit, one segment per indexing thread is written to disk, and the `meta.json` is then updated atomically.
 
-For a better idea of how indexing works, you may read the [following blog post](https://fulmicoton.com/posts/behold-tantivy-part2/).
+For a better idea of how indexing works, you may read the [following blog post](https://fulmicoton.com/posts/behold-lucivy-part2/).
 
 ### Deletes
 
-Deletes happen by deleting a "term". Tantivy does not offer any notion of primary id, so it is up to the user to use a field in their schema as if it was a primary id, and delete the associated term if they want to delete only one specific document.
+Deletes happen by deleting a "term". Lucivy does not offer any notion of primary id, so it is up to the user to use a field in their schema as if it was a primary id, and delete the associated term if they want to delete only one specific document.
 
-On commit, tantivy will find all of the segments with documents matching this existing term and remove from [alive bitset file](src/fastfield/alive_bitset.rs) that represents the bitset of the alive document ids.
+On commit, lucivy will find all of the segments with documents matching this existing term and remove from [alive bitset file](src/fastfield/alive_bitset.rs) that represents the bitset of the alive document ids.
 Like all segment files, this file is immutable. Because it is possible to have more than one alive bitset file at a given instant, the alive bitset filename has the format ```segment_id . commit_opstamp . del```.
 
 An opstamp is simply an incremental id that identifies any operation applied to the index. For instance, performing a commit or adding a document.
@@ -72,7 +72,7 @@ The DocIds are simply allocated in the order documents are added to the index.
 
 ### Merges
 
-In separate threads, tantivy's index writer search for opportunities to merge segments.
+In separate threads, lucivy's index writer search for opportunities to merge segments.
 The point of segment merge is to:
 
 - eventually get rid of tombstoned documents
@@ -90,19 +90,19 @@ In other words, regardless of commits, file garbage collection, or segment merge
 
 ## [directory/](src/directory): Where should the data be stored?
 
-Tantivy, like Lucene, abstracts the place where the data should be stored in a key-trait
+Lucivy, like Lucene, abstracts the place where the data should be stored in a key-trait
 called [`Directory`](src/directory/directory.rs).
 Contrary to Lucene however, "files" are quite different from some kind of `io::Read` object.
 Check out [`src/directory/directory.rs`](src/directory/directory.rs) trait for more details.
 
-Tantivy ships two main directory implementation: the `MmapDirectory` and the `RamDirectory`,
-but users can extend tantivy with their own implementation.
+Lucivy ships two main directory implementation: the `MmapDirectory` and the `RamDirectory`,
+but users can extend lucivy with their own implementation.
 
 ## [schema/](src/schema): What are documents?
 
-Tantivy's document follows a very strict schema, decided before building any index.
+Lucivy's document follows a very strict schema, decided before building any index.
 
-The schema defines all of the fields that the indexes [`Document`](src/schema/document/mod.rs) may and should contain, their types (`text`, `i64`, `u64`, `Date`, ...) as well as how it should be indexed / represented in tantivy.
+The schema defines all of the fields that the indexes [`Document`](src/schema/document/mod.rs) may and should contain, their types (`text`, `i64`, `u64`, `Date`, ...) as well as how it should be indexed / represented in lucivy.
 
 Depending on the type of the field, you can decide to
 
@@ -110,18 +110,18 @@ Depending on the type of the field, you can decide to
 - store it as a fast field
 - index it
 
-Practically, tantivy will push values associated with this type to up to 3 respective
+Practically, lucivy will push values associated with this type to up to 3 respective
 data structures.
 
 *Limitations*
 
-As of today, tantivy's schema imposes a 1:1 relationship between a field that is being ingested and a field represented in the search index. In sophisticated search application, it is fairly common to want to index a field twice using different tokenizers, or to index the concatenation of several fields together into one field.
+As of today, lucivy's schema imposes a 1:1 relationship between a field that is being ingested and a field represented in the search index. In sophisticated search application, it is fairly common to want to index a field twice using different tokenizers, or to index the concatenation of several fields together into one field.
 
-This is not something tantivy supports, and it is up to the user to duplicate field / concatenate fields before feeding them to tantivy.
+This is not something lucivy supports, and it is up to the user to duplicate field / concatenate fields before feeding them to lucivy.
 
 ## General information about these data structures
 
-All data structures in tantivy, have:
+All data structures in lucivy, have:
 
 - a writer
 - a serializer
@@ -133,7 +133,7 @@ is then converted into an on-disk immutable representation, that is extremely co
 This conversion is done by the serializer.
 
 Finally, the reader is in charge of offering an API to read on this on-disk read-only representation.
-In tantivy, readers are designed to require very little anonymous memory. The data is read straight from an mmapped file, and loading an index is as fast as mmapping its files.
+In lucivy, readers are designed to require very little anonymous memory. The data is read straight from an mmapped file, and loading an index is as fast as mmapping its files.
 
 ## [store/](src/store): Here is my DocId, Gimme my document
 
@@ -156,7 +156,7 @@ Fetching a document from the store is typically a "slow" operation. It usually c
 
 It is NOT meant to be called for every document matching a query.
 
-As a rule of thumb, if you hit the docstore more than 100 times per search query, you are probably misusing tantivy.
+As a rule of thumb, if you hit the docstore more than 100 times per search query, you are probably misusing lucivy.
 
 ## [fastfield/](src/fastfield): Here is my DocId, Gimme my value
 
@@ -181,7 +181,7 @@ In Lucene's jargon, fast fields are called DocValues.
 They are typically integer values that are useful to either rank or compute aggregate over
 all of the documents matching a query (aka [DocSet](src/docset.rs)).
 
-For instance, one could define a function to combine upvotes with tantivy's internal relevancy score.
+For instance, one could define a function to combine upvotes with lucivy's internal relevancy score.
 This can be done by fetching a fast field during scoring.
 One could also compute the mean price of the items matching a query in an e-commerce website.
 This can be done by fetching a fast field in a collector.
@@ -196,9 +196,9 @@ Finally facets are a specific kind of fast field, and the associated source code
 # The inverted search index
 
 The inverted index is the core part of full-text search.
-When presented a new document with the text field "Hello, happy tax payer!", tantivy breaks it into a list of so-called tokens. In addition to just splitting these strings into tokens, it might also do different kinds of operations like dropping the punctuation, converting the character to lowercase, apply stemming, etc. Tantivy makes it possible to configure the operations to be applied in the schema (tokenizer/ is the place where these operations are implemented).
+When presented a new document with the text field "Hello, happy tax payer!", lucivy breaks it into a list of so-called tokens. In addition to just splitting these strings into tokens, it might also do different kinds of operations like dropping the punctuation, converting the character to lowercase, apply stemming, etc. Lucivy makes it possible to configure the operations to be applied in the schema (tokenizer/ is the place where these operations are implemented).
 
-For instance, the default tokenizer of tantivy would break our text into: `[hello, happy, tax, payer]`.
+For instance, the default tokenizer of lucivy would break our text into: `[hello, happy, tax, payer]`.
 The document will therefore be registered in the inverted index as containing the terms
 `[text:hello, text:happy, text:tax, text:payer]`.
 
@@ -220,7 +220,7 @@ Where [TermInfo](src/postings/term_info.rs) is an object containing some meta da
 
 ## [termdict/](src/termdict): Here is a term, give me the [TermInfo](src/postings/term_info.rs)
 
-Tantivy's term dictionary is mainly in charge of supplying the function
+Lucivy's term dictionary is mainly in charge of supplying the function
 
 [Term](src/schema/term.rs) ⟶ [TermInfo](src/postings/term_info.rs)
 
@@ -267,7 +267,7 @@ Do not normalize, or under split your text, you will end up with a higher precis
 
 Text processing can be configured by selecting an off-the-shelf [`Tokenizer`](./src/tokenizer/tokenizer.rs) or implementing your own to first split the text into tokens, and then chain different [`TokenFilter`](src/tokenizer/tokenizer.rs)'s to it.
 
-Tantivy's comes with few tokenizers, but external crates are offering advanced tokenizers, such as [Lindera](https://crates.io/crates/lindera) for Japanese.
+Lucivy's comes with few tokenizers, but external crates are offering advanced tokenizers, such as [Lindera](https://crates.io/crates/lindera) for Japanese.
 
 ## [query/](src/query): Define and compose queries
 
@@ -279,7 +279,7 @@ The iterator over a document comes with some scoring function. The resulting tra
 [Scorer](src/query/scorer.rs) and is specific to a segment.
 
 Different queries can be combined using the [BooleanQuery](src/query/boolean_query/).
-Tantivy comes with different types of queries and can be extended by implementing
+Lucivy comes with different types of queries and can be extended by implementing
 the `Query`, `Weight`, and `Scorer` traits.
 
 ## [collector](src/collector): Define what to do with matched documents

@@ -9,7 +9,7 @@ about: Create a report to help us improve
 - What happened?
 - What was expected?
 
-**Which version of tantivy are you using?**
+**Which version of lucivy are you using?**
 If "master",  ideally give the specific sha1 revision.
 
 **To Reproduce**

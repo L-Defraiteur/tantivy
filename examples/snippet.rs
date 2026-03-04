@@ -6,15 +6,15 @@
 // The keyword searched by the user are highlighted with a `<b>` tag.
 
 // ---
-// Importing tantivy...
-use tantivy::collector::TopDocs;
-use tantivy::query::QueryParser;
-use tantivy::schema::*;
-use tantivy::snippet::{Snippet, SnippetGenerator};
-use tantivy::{doc, Index, IndexWriter};
+// Importing lucivy...
+use lucivy::collector::TopDocs;
+use lucivy::query::QueryParser;
+use lucivy::schema::*;
+use lucivy::snippet::{Snippet, SnippetGenerator};
+use lucivy::{doc, Index, IndexWriter};
 use tempfile::TempDir;
 
-fn main() -> tantivy::Result<()> {
+fn main() -> lucivy::Result<()> {
     // Let's create a temporary directory for the
     // sake of this example
     let index_path = TempDir::new()?;
@@ -55,7 +55,7 @@ fn main() -> tantivy::Result<()> {
     let snippet_generator = SnippetGenerator::create(&searcher, &*query, body)?;
 
     for (score, doc_address) in top_docs {
-        let doc = searcher.doc::<TantivyDocument>(doc_address)?;
+        let doc = searcher.doc::<LucivyDocument>(doc_address)?;
         let snippet = snippet_generator.snippet_from_doc(&doc);
         println!("Document score {score}:");
         println!("title: {}", doc.get_first(title).unwrap().as_str().unwrap());

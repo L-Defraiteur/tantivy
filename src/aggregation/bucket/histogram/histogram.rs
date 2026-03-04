@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 use columnar::{Column, ColumnType};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
-use tantivy_bitpacker::minmax;
+use lucivy_bitpacker::minmax;
 
 use crate::aggregation::agg_data::{
     build_segment_agg_collectors, AggRefNode, AggregationsSegmentCtx,
@@ -17,7 +17,7 @@ use crate::aggregation::intermediate_agg_result::{
 };
 use crate::aggregation::segment_agg_result::{BucketIdProvider, SegmentAggregationCollector};
 use crate::aggregation::*;
-use crate::TantivyError;
+use crate::LucivyError;
 
 /// Contains all information required by the SegmentHistogramCollector to perform the
 /// histogram or date_histogram aggregation on a segment.
@@ -170,13 +170,13 @@ impl HistogramAggregation {
 
     fn validate(&self) -> crate::Result<()> {
         if self.interval <= 0.0f64 {
-            return Err(TantivyError::InvalidArgument(
+            return Err(LucivyError::InvalidArgument(
                 "interval must be a positive value".to_string(),
             ));
         }
 
         if self.min_doc_count.unwrap_or(0) > 0 && self.extended_bounds.is_some() {
-            return Err(TantivyError::InvalidArgument(
+            return Err(LucivyError::InvalidArgument(
                 "Cannot set min_doc_count and extended_bounds at the same time".to_string(),
             ));
         }
@@ -184,7 +184,7 @@ impl HistogramAggregation {
         if let (Some(hard_bounds), Some(extended_bounds)) = (self.hard_bounds, self.extended_bounds)
         {
             if extended_bounds.min < hard_bounds.min || extended_bounds.max > hard_bounds.max {
-                return Err(TantivyError::InvalidArgument(format!(
+                return Err(LucivyError::InvalidArgument(format!(
                     "extended_bounds have to be inside hard_bounds, extended_bounds: \
                      {extended_bounds}, hard_bounds {hard_bounds}"
                 )));

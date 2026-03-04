@@ -1,15 +1,15 @@
 [package]
-name = "tantivy-fts"
+name = "lucivy-fts"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
-description = "C FFI bindings for Tantivy full-text search, used as a rag3db extension"
+description = "C FFI bindings for Lucivy full-text search, used as a rag3db extension"
 
 [lib]
 crate-type = ["staticlib", "lib"]
 
 [dependencies]
-ld-tantivy = { path = "../..", default-features = false, features = [
+ld-lucivy = { path = "../..", default-features = false, features = [
     "stopwords",
     "lz4-compression",
     "stemmer",

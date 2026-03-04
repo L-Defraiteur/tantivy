@@ -10,7 +10,7 @@ use crate::aggregation::intermediate_agg_result::{
 };
 use crate::aggregation::segment_agg_result::SegmentAggregationCollector;
 use crate::aggregation::*;
-use crate::TantivyError;
+use crate::LucivyError;
 
 /// A multi-value metric aggregation that computes a collection of statistics on numeric values that
 /// are extracted from the aggregated documents.
@@ -74,7 +74,7 @@ impl Stats {
             "min" => Ok(self.min),
             "max" => Ok(self.max),
             "avg" => Ok(self.avg),
-            _ => Err(TantivyError::InvalidArgument(format!(
+            _ => Err(LucivyError::InvalidArgument(format!(
                 "Unknown property {agg_property} on stats metric aggregation"
             ))),
         }
@@ -253,7 +253,7 @@ impl<const COLUMN_TYPE_ID: u8> SegmentAggregationCollector
             StatsType::Stats => IntermediateMetricResult::Stats(stats),
             StatsType::Sum => IntermediateMetricResult::Sum(IntermediateSum::from_stats(stats)),
             _ => {
-                return Err(TantivyError::InvalidArgument(format!(
+                return Err(LucivyError::InvalidArgument(format!(
                     "Unsupported stats type for stats aggregation: {:?}",
                     self.collecting_for
                 )))

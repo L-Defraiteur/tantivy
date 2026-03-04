@@ -1,20 +1,20 @@
-//! cxx bridge: typed Rust ↔ C++ interface for tantivy_fts.
+//! cxx bridge: typed Rust ↔ C++ interface for lucivy_fts.
 //!
 //! Replaces the extern "C" + JSON approach with typed structs and automatic ownership.
 //! - Documents: typed structs (zero JSON on hot path)
 //! - Search results: typed structs (node_id + score + highlights)
 //! - Query + schema: still JSON (flexible, not hot path)
-//! - Ownership: automatic via Box<TantivyHandle> + String + Vec
+//! - Ownership: automatic via Box<LucivyHandle> + String + Vec
 
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use ld_tantivy::collector::{FilterCollector, TopDocs};
-use ld_tantivy::query::HighlightSink;
-use ld_tantivy::schema::{Field, FieldType, Value as TantivyValue};
-use ld_tantivy::{DocAddress, Searcher, TantivyDocument};
+use ld_lucivy::collector::{FilterCollector, TopDocs};
+use ld_lucivy::query::HighlightSink;
+use ld_lucivy::schema::{Field, FieldType, Value as LucivyValue};
+use ld_lucivy::{DocAddress, Searcher, LucivyDocument};
 
-use crate::handle::{TantivyHandle, NGRAM_SUFFIX, NODE_ID_FIELD, RAW_SUFFIX};
+use crate::handle::{LucivyHandle, NGRAM_SUFFIX, NODE_ID_FIELD, RAW_SUFFIX};
 use crate::query;
 
 #[cxx::bridge]
@@ -71,25 +71,25 @@ mod ffi {
     // ── Rust functions exposed to C++ ────────────────────────────────────
 
     extern "Rust" {
-        type TantivyHandle;
+        type LucivyHandle;
 
         // Lifecycle
-        fn create_index(path: &str, schema_json: &str) -> Result<Box<TantivyHandle>>;
-        fn open_index(path: &str) -> Result<Box<TantivyHandle>>;
-        // close = drop of Box<TantivyHandle> (automatic)
+        fn create_index(path: &str, schema_json: &str) -> Result<Box<LucivyHandle>>;
+        fn open_index(path: &str) -> Result<Box<LucivyHandle>>;
+        // close = drop of Box<LucivyHandle> (automatic)
 
         // Schema introspection
-        fn get_field_ids(handle: &TantivyHandle) -> Vec<IndexFieldInfo>;
+        fn get_field_ids(handle: &LucivyHandle) -> Vec<IndexFieldInfo>;
 
         // Document operations (hot path — typed, zero JSON)
         fn add_document_texts(
-            handle: &TantivyHandle,
+            handle: &LucivyHandle,
             node_id: u64,
             fields: &[DocFieldText],
         ) -> Result<i64>;
 
         fn add_document_mixed(
-            handle: &TantivyHandle,
+            handle: &LucivyHandle,
             node_id: u64,
             text_fields: &[DocFieldText],
             u64_fields: &[DocFieldU64],
@@ -97,22 +97,22 @@ mod ffi {
             f64_fields: &[DocFieldF64],
         ) -> Result<i64>;
 
-        fn delete_by_node_id(handle: &TantivyHandle, node_id: u64) -> Result<i64>;
+        fn delete_by_node_id(handle: &LucivyHandle, node_id: u64) -> Result<i64>;
 
         // Transaction
-        fn commit(handle: &TantivyHandle) -> Result<i64>;
-        fn rollback(handle: &TantivyHandle);
-        fn reload_reader(handle: &TantivyHandle);
+        fn commit(handle: &LucivyHandle) -> Result<i64>;
+        fn rollback(handle: &LucivyHandle);
+        fn reload_reader(handle: &LucivyHandle);
 
         // Search (query stays JSON — flexible, not a hot path)
         fn search(
-            handle: &TantivyHandle,
+            handle: &LucivyHandle,
             query_json: &str,
             limit: u32,
         ) -> Result<Vec<SearchResult>>;
 
         fn search_with_highlights(
-            handle: &TantivyHandle,
+            handle: &LucivyHandle,
             query_json: &str,
             limit: u32,
         ) -> Result<Vec<SearchResultWithHighlights>>;
@@ -120,7 +120,7 @@ mod ffi {
         /// Typed search — bypasses JSON serialization/deserialization.
         /// Modes: "contains", "contains_split", "fuzzy", "regex", "parse".
         fn search_typed_with_highlights(
-            handle: &TantivyHandle,
+            handle: &LucivyHandle,
             field: &str,
             value: &str,
             mode: &str,
@@ -129,42 +129,42 @@ mod ffi {
         ) -> Result<Vec<SearchResultWithHighlights>>;
 
         fn search_filtered(
-            handle: &TantivyHandle,
+            handle: &LucivyHandle,
             query_json: &str,
             limit: u32,
             allowed_ids: &[u64],
         ) -> Result<Vec<SearchResult>>;
 
         fn search_filtered_with_highlights(
-            handle: &TantivyHandle,
+            handle: &LucivyHandle,
             query_json: &str,
             limit: u32,
             allowed_ids: &[u64],
         ) -> Result<Vec<SearchResultWithHighlights>>;
 
         // Info
-        fn num_docs(handle: &TantivyHandle) -> u64;
-        fn get_schema_json(handle: &TantivyHandle) -> String;
+        fn num_docs(handle: &LucivyHandle) -> u64;
+        fn get_schema_json(handle: &LucivyHandle) -> String;
     }
 }
 
 // ── Lifecycle ──────────────────────────────────────────────────────────────
 
-fn create_index(path: &str, schema_json: &str) -> Result<Box<TantivyHandle>, String> {
+fn create_index(path: &str, schema_json: &str) -> Result<Box<LucivyHandle>, String> {
     let config: query::SchemaConfig = serde_json::from_str(schema_json)
         .map_err(|e| format!("invalid schema JSON: {e}"))?;
-    let handle = TantivyHandle::create(path, &config)?;
+    let handle = LucivyHandle::create(path, &config)?;
     Ok(Box::new(handle))
 }
 
-fn open_index(path: &str) -> Result<Box<TantivyHandle>, String> {
-    let handle = TantivyHandle::open(path)?;
+fn open_index(path: &str) -> Result<Box<LucivyHandle>, String> {
+    let handle = LucivyHandle::open(path)?;
     Ok(Box::new(handle))
 }
 
 // ── Schema introspection ───────────────────────────────────────────────────
 
-fn get_field_ids(handle: &TantivyHandle) -> Vec<ffi::IndexFieldInfo> {
+fn get_field_ids(handle: &LucivyHandle) -> Vec<ffi::IndexFieldInfo> {
     handle
         .field_map
         .iter()
@@ -189,11 +189,11 @@ fn get_field_ids(handle: &TantivyHandle) -> Vec<ffi::IndexFieldInfo> {
 // ── Document operations ────────────────────────────────────────────────────
 
 fn add_document_texts(
-    handle: &TantivyHandle,
+    handle: &LucivyHandle,
     node_id: u64,
     fields: &[ffi::DocFieldText],
 ) -> Result<i64, String> {
-    let mut doc = TantivyDocument::new();
+    let mut doc = LucivyDocument::new();
 
     let nid_field = handle
         .field(NODE_ID_FIELD)
@@ -218,14 +218,14 @@ fn add_document_texts(
 }
 
 fn add_document_mixed(
-    handle: &TantivyHandle,
+    handle: &LucivyHandle,
     node_id: u64,
     text_fields: &[ffi::DocFieldText],
     u64_fields: &[ffi::DocFieldU64],
     i64_fields: &[ffi::DocFieldI64],
     f64_fields: &[ffi::DocFieldF64],
 ) -> Result<i64, String> {
-    let mut doc = TantivyDocument::new();
+    let mut doc = LucivyDocument::new();
 
     let nid_field = handle
         .field(NODE_ID_FIELD)
@@ -261,8 +261,8 @@ fn add_document_mixed(
 
 /// Auto-duplicate a text value into ._raw and ._ngram counterparts if they exist.
 fn auto_duplicate_field(
-    doc: &mut TantivyDocument,
-    handle: &TantivyHandle,
+    doc: &mut LucivyDocument,
+    handle: &LucivyHandle,
     field_name: &str,
     value: &str,
 ) {
@@ -289,11 +289,11 @@ fn auto_duplicate_field(
     }
 }
 
-fn delete_by_node_id(handle: &TantivyHandle, node_id: u64) -> Result<i64, String> {
+fn delete_by_node_id(handle: &LucivyHandle, node_id: u64) -> Result<i64, String> {
     let field = handle
         .field(NODE_ID_FIELD)
         .ok_or("no _node_id field in schema")?;
-    let term = ld_tantivy::schema::Term::from_field_u64(field, node_id);
+    let term = ld_lucivy::schema::Term::from_field_u64(field, node_id);
     let writer = handle
         .writer
         .lock()
@@ -303,7 +303,7 @@ fn delete_by_node_id(handle: &TantivyHandle, node_id: u64) -> Result<i64, String
 
 // ── Transaction ────────────────────────────────────────────────────────────
 
-fn commit(handle: &TantivyHandle) -> Result<i64, String> {
+fn commit(handle: &LucivyHandle) -> Result<i64, String> {
     let mut writer = handle
         .writer
         .lock()
@@ -314,13 +314,13 @@ fn commit(handle: &TantivyHandle) -> Result<i64, String> {
         .map_err(|e| e.to_string())
 }
 
-fn rollback(handle: &TantivyHandle) {
+fn rollback(handle: &LucivyHandle) {
     if let Ok(mut writer) = handle.writer.lock() {
         let _ = writer.rollback();
     }
 }
 
-fn reload_reader(handle: &TantivyHandle) {
+fn reload_reader(handle: &LucivyHandle) {
     if let Err(e) = handle.reader.reload() {
         eprintln!("reload_reader: {e}");
     }
@@ -329,14 +329,14 @@ fn reload_reader(handle: &TantivyHandle) {
 // ── Search ─────────────────────────────────────────────────────────────────
 
 fn search(
-    handle: &TantivyHandle,
+    handle: &LucivyHandle,
     query_json: &str,
     limit: u32,
 ) -> Result<Vec<ffi::SearchResult>, String> {
     let config: query::QueryConfig = serde_json::from_str(query_json)
         .map_err(|e| format!("invalid query JSON: {e}"))?;
 
-    let tantivy_query = query::build_query(
+    let lucivy_query = query::build_query(
         &config,
         &handle.schema,
         &handle.index,
@@ -346,12 +346,12 @@ fn search(
     )?;
 
     let searcher = handle.reader.searcher();
-    let top_docs = execute_top_docs(&searcher, tantivy_query.as_ref(), limit)?;
+    let top_docs = execute_top_docs(&searcher, lucivy_query.as_ref(), limit)?;
     collect_search_results(&searcher, &top_docs, &handle.schema)
 }
 
 fn search_with_highlights(
-    handle: &TantivyHandle,
+    handle: &LucivyHandle,
     query_json: &str,
     limit: u32,
 ) -> Result<Vec<ffi::SearchResultWithHighlights>, String> {
@@ -360,7 +360,7 @@ fn search_with_highlights(
 
     let highlight_sink = Arc::new(HighlightSink::new());
 
-    let tantivy_query = query::build_query(
+    let lucivy_query = query::build_query(
         &config,
         &handle.schema,
         &handle.index,
@@ -370,7 +370,7 @@ fn search_with_highlights(
     )?;
 
     let searcher = handle.reader.searcher();
-    let top_docs = execute_top_docs(&searcher, tantivy_query.as_ref(), limit)?;
+    let top_docs = execute_top_docs(&searcher, lucivy_query.as_ref(), limit)?;
     collect_search_results_with_highlights(
         &searcher,
         &top_docs,
@@ -446,7 +446,7 @@ fn build_typed_query_config(
 }
 
 fn search_typed_with_highlights(
-    handle: &TantivyHandle,
+    handle: &LucivyHandle,
     field: &str,
     value: &str,
     mode: &str,
@@ -457,7 +457,7 @@ fn search_typed_with_highlights(
 
     let highlight_sink = Arc::new(HighlightSink::new());
 
-    let tantivy_query = query::build_query(
+    let lucivy_query = query::build_query(
         &config,
         &handle.schema,
         &handle.index,
@@ -467,7 +467,7 @@ fn search_typed_with_highlights(
     )?;
 
     let searcher = handle.reader.searcher();
-    let top_docs = execute_top_docs(&searcher, tantivy_query.as_ref(), limit)?;
+    let top_docs = execute_top_docs(&searcher, lucivy_query.as_ref(), limit)?;
     collect_search_results_with_highlights(
         &searcher,
         &top_docs,
@@ -479,7 +479,7 @@ fn search_typed_with_highlights(
 // ── Filtered search ─────────────────────────────────────────────────────
 
 fn search_filtered(
-    handle: &TantivyHandle,
+    handle: &LucivyHandle,
     query_json: &str,
     limit: u32,
     allowed_ids: &[u64],
@@ -487,7 +487,7 @@ fn search_filtered(
     let config: query::QueryConfig = serde_json::from_str(query_json)
         .map_err(|e| format!("invalid query JSON: {e}"))?;
 
-    let tantivy_query = query::build_query(
+    let lucivy_query = query::build_query(
         &config,
         &handle.schema,
         &handle.index,
@@ -498,12 +498,12 @@ fn search_filtered(
 
     let id_set: HashSet<u64> = allowed_ids.iter().copied().collect();
     let searcher = handle.reader.searcher();
-    let top_docs = execute_top_docs_filtered(&searcher, tantivy_query.as_ref(), limit, id_set)?;
+    let top_docs = execute_top_docs_filtered(&searcher, lucivy_query.as_ref(), limit, id_set)?;
     collect_search_results(&searcher, &top_docs, &handle.schema)
 }
 
 fn search_filtered_with_highlights(
-    handle: &TantivyHandle,
+    handle: &LucivyHandle,
     query_json: &str,
     limit: u32,
     allowed_ids: &[u64],
@@ -513,7 +513,7 @@ fn search_filtered_with_highlights(
 
     let highlight_sink = Arc::new(HighlightSink::new());
 
-    let tantivy_query = query::build_query(
+    let lucivy_query = query::build_query(
         &config,
         &handle.schema,
         &handle.index,
@@ -524,7 +524,7 @@ fn search_filtered_with_highlights(
 
     let id_set: HashSet<u64> = allowed_ids.iter().copied().collect();
     let searcher = handle.reader.searcher();
-    let top_docs = execute_top_docs_filtered(&searcher, tantivy_query.as_ref(), limit, id_set)?;
+    let top_docs = execute_top_docs_filtered(&searcher, lucivy_query.as_ref(), limit, id_set)?;
     collect_search_results_with_highlights(
         &searcher,
         &top_docs,
@@ -535,11 +535,11 @@ fn search_filtered_with_highlights(
 
 // ── Info ───────────────────────────────────────────────────────────────────
 
-fn num_docs(handle: &TantivyHandle) -> u64 {
+fn num_docs(handle: &LucivyHandle) -> u64 {
     handle.reader.searcher().num_docs()
 }
 
-fn get_schema_json(handle: &TantivyHandle) -> String {
+fn get_schema_json(handle: &LucivyHandle) -> String {
     serde_json::to_string(&handle.schema).unwrap_or_default()
 }
 
@@ -547,7 +547,7 @@ fn get_schema_json(handle: &TantivyHandle) -> String {
 
 fn execute_top_docs(
     searcher: &Searcher,
-    query: &dyn ld_tantivy::query::Query,
+    query: &dyn ld_lucivy::query::Query,
     limit: u32,
 ) -> Result<Vec<(f32, DocAddress)>, String> {
     let collector = TopDocs::with_limit(limit as usize).order_by_score();
@@ -558,7 +558,7 @@ fn execute_top_docs(
 
 fn execute_top_docs_filtered(
     searcher: &Searcher,
-    query: &dyn ld_tantivy::query::Query,
+    query: &dyn ld_lucivy::query::Query,
     limit: u32,
     allowed_ids: HashSet<u64>,
 ) -> Result<Vec<(f32, DocAddress)>, String> {
@@ -576,7 +576,7 @@ fn execute_top_docs_filtered(
 fn collect_search_results(
     searcher: &Searcher,
     top_docs: &[(f32, DocAddress)],
-    schema: &ld_tantivy::schema::Schema,
+    schema: &ld_lucivy::schema::Schema,
 ) -> Result<Vec<ffi::SearchResult>, String> {
     let nid_field = schema
         .get_field(NODE_ID_FIELD)
@@ -584,7 +584,7 @@ fn collect_search_results(
 
     let mut results = Vec::with_capacity(top_docs.len());
     for &(score, doc_addr) in top_docs {
-        let doc: TantivyDocument = searcher.doc(doc_addr).map_err(|e| e.to_string())?;
+        let doc: LucivyDocument = searcher.doc(doc_addr).map_err(|e| e.to_string())?;
         let node_id = extract_node_id(&doc, nid_field);
         results.push(ffi::SearchResult { node_id, score });
     }
@@ -594,7 +594,7 @@ fn collect_search_results(
 fn collect_search_results_with_highlights(
     searcher: &Searcher,
     top_docs: &[(f32, DocAddress)],
-    schema: &ld_tantivy::schema::Schema,
+    schema: &ld_lucivy::schema::Schema,
     highlight_sink: Option<&HighlightSink>,
 ) -> Result<Vec<ffi::SearchResultWithHighlights>, String> {
     let nid_field = schema
@@ -603,7 +603,7 @@ fn collect_search_results_with_highlights(
 
     let mut results = Vec::with_capacity(top_docs.len());
     for &(score, doc_addr) in top_docs {
-        let doc: TantivyDocument = searcher.doc(doc_addr).map_err(|e| e.to_string())?;
+        let doc: LucivyDocument = searcher.doc(doc_addr).map_err(|e| e.to_string())?;
         let node_id = extract_node_id(&doc, nid_field);
 
         let highlights = highlight_sink
@@ -635,7 +635,7 @@ fn collect_search_results_with_highlights(
     Ok(results)
 }
 
-fn extract_node_id(doc: &TantivyDocument, nid_field: Field) -> u64 {
+fn extract_node_id(doc: &LucivyDocument, nid_field: Field) -> u64 {
     doc.get_first(nid_field)
         .and_then(|v| v.as_value().as_u64())
         .unwrap_or(0)

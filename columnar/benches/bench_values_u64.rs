@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use binggan::{InputGroup, black_box};
 use rand::prelude::*;
-use tantivy_columnar::column_values::{CodecType, serialize_and_load_u64_based_column_values};
-use tantivy_columnar::*;
+use lucivy_columnar::column_values::{CodecType, serialize_and_load_u64_based_column_values};
+use lucivy_columnar::*;
 
 // Warning: this generates the same permutation at each call
 fn generate_permutation() -> Vec<u64> {

@@ -8,9 +8,9 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::*;
 use crate::json_utils::split_json_path;
-use crate::TantivyError;
+use crate::LucivyError;
 
-/// Tantivy has a very strict schema.
+/// Lucivy has a very strict schema.
 /// You need to specify in advance whether a field is indexed or not,
 /// stored or not, and RAM-based or not.
 ///
@@ -21,7 +21,7 @@ use crate::TantivyError;
 /// # Examples
 ///
 /// ```
-/// use tantivy::schema::*;
+/// use lucivy::schema::*;
 ///
 /// let mut schema_builder = Schema::builder();
 /// let id_field = schema_builder.add_text_field("id", STRING);
@@ -107,7 +107,7 @@ impl SchemaBuilder {
 
     /// Adds a new date field.
     /// Returns the associated field handle
-    /// Internally, Tantivy simply stores dates as i64 UTC timestamps,
+    /// Internally, Lucivy simply stores dates as i64 UTC timestamps,
     /// while the user supplies DateTime values for convenience.
     ///
     /// # Panics
@@ -228,7 +228,7 @@ impl PartialEq for InnerSchema {
 
 impl Eq for InnerSchema {}
 
-/// Tantivy has a very strict schema.
+/// Lucivy has a very strict schema.
 /// You need to specify in advance, whether a field is indexed or not,
 /// stored or not, and RAM-based or not.
 ///
@@ -239,7 +239,7 @@ impl Eq for InnerSchema {}
 /// # Examples
 ///
 /// ```
-/// use tantivy::schema::*;
+/// use lucivy::schema::*;
 ///
 /// let mut schema_builder = Schema::builder();
 /// let id_field = schema_builder.add_text_field("id", STRING);
@@ -312,7 +312,7 @@ impl Schema {
             .fields_map
             .get(field_name)
             .cloned()
-            .ok_or_else(|| TantivyError::FieldNotFound(field_name.to_string()))
+            .ok_or_else(|| LucivyError::FieldNotFound(field_name.to_string()))
     }
 
     /// Searches for a full_path in the schema, returning the field name and a JSON path.
@@ -588,9 +588,9 @@ mod tests {
                 "ip": "127.0.0.1",
                 "is_read": true
         }"#;
-        let doc = TantivyDocument::parse_json(&schema, doc_json).unwrap();
+        let doc = LucivyDocument::parse_json(&schema, doc_json).unwrap();
 
-        let doc_serdeser = TantivyDocument::parse_json(&schema, &doc.to_json(&schema)).unwrap();
+        let doc_serdeser = LucivyDocument::parse_json(&schema, &doc.to_json(&schema)).unwrap();
         assert_eq!(doc, doc_serdeser);
     }
 
@@ -604,7 +604,7 @@ mod tests {
         let doc_json = r#"{
                 "ip": "127.0.0.1"
         }"#;
-        let doc = TantivyDocument::parse_json(&schema, doc_json).unwrap();
+        let doc = LucivyDocument::parse_json(&schema, doc_json).unwrap();
         let value: serde_json::Value = serde_json::from_str(&doc.to_json(&schema)).unwrap();
         assert_eq!(value["ip"][0], "127.0.0.1");
 
@@ -612,7 +612,7 @@ mod tests {
         let doc_json = r#"{
                 "ip": "::1"
         }"#;
-        let doc = TantivyDocument::parse_json(&schema, doc_json).unwrap();
+        let doc = LucivyDocument::parse_json(&schema, doc_json).unwrap();
 
         let value: serde_json::Value = serde_json::from_str(&doc.to_json(&schema)).unwrap();
         assert_eq!(value["ip"][0], "::1");
@@ -621,7 +621,7 @@ mod tests {
         let doc_json = r#"{
                 "ip": "192.168.0.1"
         }"#;
-        let doc = TantivyDocument::parse_json(&schema, doc_json).unwrap();
+        let doc = LucivyDocument::parse_json(&schema, doc_json).unwrap();
 
         let value: serde_json::Value = serde_json::from_str(&doc.to_json(&schema)).unwrap();
         assert_eq!(value["ip"][0], "192.168.0.1");
@@ -643,7 +643,7 @@ mod tests {
             vec![OwnedValue::from(14u64), OwnedValue::from(-1i64)],
         );
         let doc =
-            TantivyDocument::convert_named_doc(&schema, NamedFieldDocument(named_doc_map)).unwrap();
+            LucivyDocument::convert_named_doc(&schema, NamedFieldDocument(named_doc_map)).unwrap();
         assert_eq!(
             doc.get_all(title).map(OwnedValue::from).collect::<Vec<_>>(),
             vec![
@@ -665,7 +665,7 @@ mod tests {
             "title".to_string(),
             vec![OwnedValue::from("title1"), OwnedValue::from("title2")],
         );
-        TantivyDocument::convert_named_doc(&schema, NamedFieldDocument(named_doc_map)).unwrap();
+        LucivyDocument::convert_named_doc(&schema, NamedFieldDocument(named_doc_map)).unwrap();
     }
 
     #[test]
@@ -681,11 +681,11 @@ mod tests {
         let score_field = schema_builder.add_f64_field("score", score_options);
         let schema = schema_builder.build();
         {
-            let doc = TantivyDocument::parse_json(&schema, "{}").unwrap();
+            let doc = LucivyDocument::parse_json(&schema, "{}").unwrap();
             assert!(doc.field_values().next().is_none());
         }
         {
-            let doc = TantivyDocument::parse_json(
+            let doc = LucivyDocument::parse_json(
                 &schema,
                 r#"{
                 "title": "my title",
@@ -709,7 +709,7 @@ mod tests {
             assert_eq!(doc.get_first(score_field).unwrap().as_f64(), Some(80.5f64));
         }
         {
-            let res = TantivyDocument::parse_json(
+            let res = LucivyDocument::parse_json(
                 &schema,
                 r#"{
                 "thisfieldisnotdefinedintheschema": "my title",
@@ -724,7 +724,7 @@ mod tests {
             assert!(res.is_ok());
         }
         {
-            let json_err = TantivyDocument::parse_json(
+            let json_err = LucivyDocument::parse_json(
                 &schema,
                 r#"{
                 "title": "my title",
@@ -744,7 +744,7 @@ mod tests {
             );
         }
         {
-            let json_err = TantivyDocument::parse_json(
+            let json_err = LucivyDocument::parse_json(
                 &schema,
                 r#"{
                 "title": "my title",
@@ -763,7 +763,7 @@ mod tests {
             );
         }
         {
-            let json_err = TantivyDocument::parse_json(
+            let json_err = LucivyDocument::parse_json(
                 &schema,
                 r#"{
                 "title": "my title",
@@ -782,7 +782,7 @@ mod tests {
             ));
         }
         {
-            let json_err = TantivyDocument::parse_json(
+            let json_err = LucivyDocument::parse_json(
                 &schema,
                 r#"{
                 "title": "my title",
@@ -802,11 +802,11 @@ mod tests {
         }
         {
             // Short JSON, under the 20 char take.
-            let json_err = TantivyDocument::parse_json(&schema, r#"{"count": 50,}"#);
+            let json_err = LucivyDocument::parse_json(&schema, r#"{"count": 50,}"#);
             assert_matches!(json_err, Err(InvalidJson(_)));
         }
         {
-            let json_err = TantivyDocument::parse_json(
+            let json_err = LucivyDocument::parse_json(
                 &schema,
                 r#"{
                 "title": "my title",

@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex, Weak};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
-use crate::{Executor, Inventory, Searcher, SearcherGeneration, TantivyError};
+use crate::{Executor, Inventory, Searcher, SearcherGeneration, LucivyError};
 
 pub const GC_INTERVAL: Duration = Duration::from_secs(1);
 
@@ -135,10 +135,10 @@ impl WarmingStateInner {
         }
         let weak_inner = Arc::downgrade(this);
         let handle = std::thread::Builder::new()
-            .name("tantivy-warm-gc".to_owned())
+            .name("lucivy-warm-gc".to_owned())
             .spawn(|| Self::gc_loop(weak_inner))
             .map_err(|_| {
-                TantivyError::SystemError("Failed to spawn warmer GC thread".to_owned())
+                LucivyError::SystemError("Failed to spawn warmer GC thread".to_owned())
             })?;
         self.gc_thread = Some(handle);
         Ok(true)
@@ -166,7 +166,7 @@ fn warming_executor(num_threads: usize) -> crate::Result<Executor> {
     if num_threads <= 1 {
         Ok(Executor::single_thread())
     } else {
-        Executor::multi_thread(num_threads, "tantivy-warm-")
+        Executor::multi_thread(num_threads, "lucivy-warm-")
     }
 }
 

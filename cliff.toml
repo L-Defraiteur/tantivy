@@ -3,7 +3,7 @@
 
 [remote.github]
 owner = "quickwit-oss"
-repo = "tantivy"
+repo = "lucivy"
 
 [changelog]
 # changelog header

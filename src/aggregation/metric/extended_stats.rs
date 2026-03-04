@@ -10,7 +10,7 @@ use crate::aggregation::intermediate_agg_result::{
 };
 use crate::aggregation::segment_agg_result::SegmentAggregationCollector;
 use crate::aggregation::*;
-use crate::TantivyError;
+use crate::LucivyError;
 
 /// A multi-value metric aggregation that computes a collection of extended statistics
 /// on numeric values that are extracted
@@ -156,7 +156,7 @@ impl ExtendedStats {
                 .std_deviation_bounds
                 .as_ref()
                 .map(|bounds| bounds.upper_sampling)),
-            _ => Err(TantivyError::InvalidArgument(format!(
+            _ => Err(LucivyError::InvalidArgument(format!(
                 "Unknown property {agg_property} on stats metric aggregation"
             ))),
         }

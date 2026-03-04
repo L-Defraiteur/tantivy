@@ -2,18 +2,18 @@
 //
 // This example shows how the DateTime field can be used
 
-use tantivy::collector::TopDocs;
-use tantivy::query::QueryParser;
-use tantivy::schema::{DateOptions, Document, Schema, Value, INDEXED, STORED, STRING};
-use tantivy::{Index, IndexWriter, TantivyDocument};
+use lucivy::collector::TopDocs;
+use lucivy::query::QueryParser;
+use lucivy::schema::{DateOptions, Document, Schema, Value, INDEXED, STORED, STRING};
+use lucivy::{Index, IndexWriter, LucivyDocument};
 
-fn main() -> tantivy::Result<()> {
+fn main() -> lucivy::Result<()> {
     // # Defining the schema
     let mut schema_builder = Schema::builder();
     let opts = DateOptions::from(INDEXED)
         .set_stored()
         .set_fast()
-        .set_precision(tantivy::schema::DateTimePrecision::Seconds);
+        .set_precision(lucivy::schema::DateTimePrecision::Seconds);
     // Add `occurred_at` date field type
     let occurred_at = schema_builder.add_date_field("occurred_at", opts);
     let event_type = schema_builder.add_text_field("event", STRING | STORED);
@@ -24,7 +24,7 @@ fn main() -> tantivy::Result<()> {
 
     let mut index_writer: IndexWriter = index.writer(50_000_000)?;
     // The dates are passed as string in the RFC3339 format
-    let doc = TantivyDocument::parse_json(
+    let doc = LucivyDocument::parse_json(
         &schema,
         r#"{
         "occurred_at": "2022-06-22T12:53:50.53Z",
@@ -32,7 +32,7 @@ fn main() -> tantivy::Result<()> {
     }"#,
     )?;
     index_writer.add_document(doc)?;
-    let doc = TantivyDocument::parse_json(
+    let doc = LucivyDocument::parse_json(
         &schema,
         r#"{
         "occurred_at": "2022-06-22T13:00:00.22Z",
@@ -60,7 +60,7 @@ fn main() -> tantivy::Result<()> {
         let count_docs = searcher.search(&*query, &TopDocs::with_limit(4).order_by_score())?;
         assert_eq!(count_docs.len(), 1);
         for (_score, doc_address) in count_docs {
-            let retrieved_doc = searcher.doc::<TantivyDocument>(doc_address)?;
+            let retrieved_doc = searcher.doc::<LucivyDocument>(doc_address)?;
             assert!(retrieved_doc
                 .get_first(occurred_at)
                 .unwrap()

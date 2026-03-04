@@ -10,9 +10,9 @@ use crate::schema::Schema;
 use crate::store::store_compressor::BlockCompressor;
 use crate::DocId;
 
-/// Write tantivy's [`Store`](./index.html)
+/// Write lucivy's [`Store`](./index.html)
 ///
-/// Contrary to the other components of `tantivy`,
+/// Contrary to the other components of `lucivy`,
 /// the store is written to disc as document as being added,
 /// as opposed to when the segment is getting finalized.
 ///

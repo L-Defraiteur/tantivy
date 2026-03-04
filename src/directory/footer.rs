@@ -50,7 +50,7 @@ impl Footer {
         Ok(())
     }
 
-    /// Extracts the tantivy Footer from the file and returns the footer and the rest of the file
+    /// Extracts the lucivy Footer from the file and returns the footer and the rest of the file
     pub fn extract_footer(file: FileSlice) -> io::Result<(Footer, FileSlice)> {
         if file.len() < 4 {
             return Err(io::Error::new(
@@ -73,7 +73,7 @@ impl Footer {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 "Footer magic byte mismatch. File corrupted or index was created using old an \
-                 tantivy version which is not supported anymore. Please use tantivy 0.15 or above \
+                 lucivy version which is not supported anymore. Please use lucivy 0.15 or above \
                  to recreate the index.",
             ));
         }
@@ -84,7 +84,7 @@ impl Footer {
                 format!(
                     "Footer seems invalid as it suggests a footer len of {footer_len}. File is \
                      corrupted, or the index was created with a different & old version of \
-                     tantivy."
+                     lucivy."
                 ),
             ));
         }
@@ -108,7 +108,7 @@ impl Footer {
         Ok((footer, body))
     }
 
-    /// Extracts the tantivy Footer from the file asynchronously
+    /// Extracts the lucivy Footer from the file asynchronously
     #[cfg(feature = "quickwit")]
     pub async fn extract_footer_async(file: FileSlice) -> io::Result<(Footer, FileSlice)> {
         if file.len() < 4 {
@@ -133,7 +133,7 @@ impl Footer {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 "Footer magic byte mismatch. File corrupted or index was created using old an \
-                 tantivy version which is not supported anymore. Please use tantivy 0.15 or above \
+                 lucivy version which is not supported anymore. Please use lucivy 0.15 or above \
                  to recreate the index.",
             ));
         }
@@ -144,7 +144,7 @@ impl Footer {
                 format!(
                     "Footer seems invalid as it suggests a footer len of {footer_len}. File is \
                      corrupted, or the index was created with a different & old version of \
-                     tantivy."
+                     lucivy."
                 ),
             ));
         }
@@ -169,7 +169,7 @@ impl Footer {
         Ok((footer, body))
     }
 
-    /// Confirms that the index will be read correctly by this version of tantivy
+    /// Confirms that the index will be read correctly by this version of lucivy
     /// Has to be called after `extract_footer` to make sure it's not accessing uninitialised memory
     pub fn is_compatible(&self) -> Result<(), Incompatibility> {
         const SUPPORTED_INDEX_FORMAT_VERSION_RANGE: std::ops::RangeInclusive<u32> =
@@ -258,8 +258,8 @@ mod tests {
         let err = Footer::extract_footer(fileslice).unwrap_err();
         assert_eq!(
             err.to_string(),
-            "Footer magic byte mismatch. File corrupted or index was created using old an tantivy \
-             version which is not supported anymore. Please use tantivy 0.15 or above to recreate \
+            "Footer magic byte mismatch. File corrupted or index was created using old an lucivy \
+             version which is not supported anymore. Please use lucivy 0.15 or above to recreate \
              the index."
         );
     }
@@ -296,7 +296,7 @@ mod tests {
         assert_eq!(
             err.to_string(),
             "Footer seems invalid as it suggests a footer len of 50001. File is corrupted, or the \
-             index was created with a different & old version of tantivy."
+             index was created with a different & old version of lucivy."
         );
     }
 }

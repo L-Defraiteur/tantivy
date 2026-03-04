@@ -1,12 +1,12 @@
 // # Indexing from different threads.
 //
 // It is fairly common to have to index from different threads.
-// Tantivy forbids to create more than one `IndexWriter` at a time.
+// Lucivy forbids to create more than one `IndexWriter` at a time.
 //
 // This `IndexWriter` itself has its own multithreaded layer, so managing your own
 // indexing threads will not help. However, it can still be useful for some applications.
 //
-// For instance, if preparing documents to send to tantivy before indexing is the bottleneck of
+// For instance, if preparing documents to send to lucivy before indexing is the bottleneck of
 // your application, it is reasonable to have multiple threads.
 //
 // Another very common reason to want to index from multiple threads, is implementing a webserver
@@ -24,15 +24,15 @@
 // from several threads possible.
 
 // ---
-// Importing tantivy...
+// Importing lucivy...
 use std::sync::{Arc, RwLock};
 use std::thread;
 use std::time::Duration;
 
-use tantivy::schema::{Schema, STORED, TEXT};
-use tantivy::{doc, Index, IndexWriter, Opstamp, TantivyError};
+use lucivy::schema::{Schema, STORED, TEXT};
+use lucivy::{doc, Index, IndexWriter, Opstamp, LucivyError};
 
-fn main() -> tantivy::Result<()> {
+fn main() -> lucivy::Result<()> {
     // # Defining the schema
     let mut schema_builder = Schema::builder();
     let title = schema_builder.add_text_field("title", TEXT | STORED);
@@ -64,12 +64,12 @@ fn main() -> tantivy::Result<()> {
             println!("add doc {i} from thread 1 - opstamp {opstamp}");
             thread::sleep(Duration::from_millis(20));
         }
-        Result::<(), TantivyError>::Ok(())
+        Result::<(), LucivyError>::Ok(())
     });
 
     // # Second indexing thread.
     let index_writer_clone_2 = index_writer.clone();
-    // For convenience, tantivy also comes with a macro to
+    // For convenience, lucivy also comes with a macro to
     // reduce the boilerplate above.
     thread::spawn(move || {
         // we index 100 times the document... for the sake of the example.
@@ -85,7 +85,7 @@ fn main() -> tantivy::Result<()> {
             println!("add doc {i} from thread 2 - opstamp {opstamp}");
             thread::sleep(Duration::from_millis(10));
         }
-        Result::<(), TantivyError>::Ok(())
+        Result::<(), LucivyError>::Ok(())
     });
 
     // # In the main thread, we commit 10 times, once every 500ms.

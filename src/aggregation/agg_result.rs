@@ -13,7 +13,7 @@ use super::metric::{
     ExtendedStats, PercentilesMetricResult, SingleMetricResult, Stats, TopHitsMetricResult,
 };
 use super::{AggregationError, Key};
-use crate::TantivyError;
+use crate::LucivyError;
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 /// The final aggregation result.
@@ -36,7 +36,7 @@ impl AggregationResults {
             agg.get_value_from_aggregation(name, agg_property)
         } else {
             // Validation is be done during request parsing, so we can't reach this state.
-            Err(TantivyError::InternalError(format!(
+            Err(LucivyError::InternalError(format!(
                 "Can't find aggregation {name:?} in sub-aggregations"
             )))
         }
@@ -67,7 +67,7 @@ impl AggregationResult {
         agg_property: &str,
     ) -> crate::Result<Option<f64>> {
         match self {
-            AggregationResult::BucketResult(_bucket) => Err(TantivyError::InternalError(
+            AggregationResult::BucketResult(_bucket) => Err(LucivyError::InternalError(
                 "Tried to retrieve value from bucket aggregation. This is not supported and \
                  should not happen during collection phase, but should be caught during validation"
                     .to_string(),
@@ -113,10 +113,10 @@ impl MetricResult {
             MetricResult::Stats(stats) => stats.get_value(agg_property),
             MetricResult::ExtendedStats(extended_stats) => extended_stats.get_value(agg_property),
             MetricResult::Sum(sum) => Ok(sum.value),
-            MetricResult::Percentiles(_) => Err(TantivyError::AggregationError(
+            MetricResult::Percentiles(_) => Err(LucivyError::AggregationError(
                 AggregationError::InvalidRequest("percentiles can't be used to order".to_string()),
             )),
-            MetricResult::TopHits(_) => Err(TantivyError::AggregationError(
+            MetricResult::TopHits(_) => Err(LucivyError::AggregationError(
                 AggregationError::InvalidRequest("top_hits can't be used to order".to_string()),
             )),
             MetricResult::Cardinality(card) => Ok(card.value),

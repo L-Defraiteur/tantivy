@@ -183,7 +183,7 @@ impl IndexMerger {
                 "The segment resulting from this merge would have {max_doc} docs,which exceeds \
                  the limit {MAX_DOC_LIMIT}."
             );
-            return Err(crate::TantivyError::InvalidArgument(err_msg));
+            return Err(crate::LucivyError::InvalidArgument(err_msg));
         }
         Ok(IndexMerger {
             schema,
@@ -569,7 +569,7 @@ mod tests {
     use crate::indexer::NoMergePolicy;
     use crate::query::{AllQuery, BooleanQuery, EnableScoring, Scorer, TermQuery};
     use crate::schema::{
-        Facet, FacetOptions, IndexRecordOption, NumericOptions, TantivyDocument, Term,
+        Facet, FacetOptions, IndexRecordOption, NumericOptions, LucivyDocument, Term,
         TextFieldIndexing, Value, INDEXED, TEXT,
     };
     use crate::time::OffsetDateTime;
@@ -681,32 +681,32 @@ mod tests {
                 );
             }
             {
-                let doc = searcher.doc::<TantivyDocument>(DocAddress::new(0, 0))?;
+                let doc = searcher.doc::<LucivyDocument>(DocAddress::new(0, 0))?;
                 assert_eq!(
                     doc.get_first(text_field).unwrap().as_value().as_str(),
                     Some("af b")
                 );
             }
             {
-                let doc = searcher.doc::<TantivyDocument>(DocAddress::new(0, 1))?;
+                let doc = searcher.doc::<LucivyDocument>(DocAddress::new(0, 1))?;
                 assert_eq!(
                     doc.get_first(text_field).unwrap().as_value().as_str(),
                     Some("a b c")
                 );
             }
             {
-                let doc = searcher.doc::<TantivyDocument>(DocAddress::new(0, 2))?;
+                let doc = searcher.doc::<LucivyDocument>(DocAddress::new(0, 2))?;
                 assert_eq!(
                     doc.get_first(text_field).unwrap().as_value().as_str(),
                     Some("a b c d")
                 );
             }
             {
-                let doc = searcher.doc::<TantivyDocument>(DocAddress::new(0, 3))?;
+                let doc = searcher.doc::<LucivyDocument>(DocAddress::new(0, 3))?;
                 assert_eq!(doc.get_first(text_field).unwrap().as_str(), Some("af b"));
             }
             {
-                let doc = searcher.doc::<TantivyDocument>(DocAddress::new(0, 4))?;
+                let doc = searcher.doc::<LucivyDocument>(DocAddress::new(0, 4))?;
                 assert_eq!(doc.get_first(text_field).unwrap().as_str(), Some("a b c g"));
             }
 
@@ -1067,7 +1067,7 @@ mod tests {
             let mut index_writer: IndexWriter = index.writer_for_tests().unwrap();
             let index_doc =
                 |index_writer: &mut IndexWriter, doc_facets: &[&str], int_val: &mut u64| {
-                    let mut doc = TantivyDocument::default();
+                    let mut doc = LucivyDocument::default();
                     for facet in doc_facets {
                         doc.add_facet(facet_field, Facet::from(facet));
                     }
@@ -1224,7 +1224,7 @@ mod tests {
         let reader = index.reader()?;
         {
             let mut index_writer = index.writer_for_tests()?;
-            let mut doc = TantivyDocument::default();
+            let mut doc = LucivyDocument::default();
             doc.add_u64(int_field, 1);
             index_writer.add_document(doc.clone())?;
             index_writer.commit()?;
@@ -1299,7 +1299,7 @@ mod tests {
             let mut index_writer = index.writer_for_tests()?;
             index_writer.set_merge_policy(Box::new(NoMergePolicy));
             let index_doc = |index_writer: &mut IndexWriter, int_vals: &[u64]| {
-                let mut doc = TantivyDocument::default();
+                let mut doc = LucivyDocument::default();
                 for &val in int_vals {
                     doc.add_u64(int_field, val);
                 }
@@ -1373,7 +1373,7 @@ mod tests {
         {
             let mut index_writer = index.writer_for_tests()?;
             let index_doc = |index_writer: &mut IndexWriter, int_vals: &[u64]| {
-                let mut doc = TantivyDocument::default();
+                let mut doc = LucivyDocument::default();
                 for &val in int_vals {
                     doc.add_u64(int_field, val);
                 }
@@ -1483,7 +1483,7 @@ mod tests {
         writer.set_merge_policy(Box::new(policy));
 
         for i in 0..100 {
-            let mut doc = TantivyDocument::new();
+            let mut doc = LucivyDocument::new();
             doc.add_f64(field, 42.0);
             doc.add_f64(multi_field, 0.24);
             doc.add_f64(multi_field, 0.27);

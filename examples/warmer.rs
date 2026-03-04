@@ -2,11 +2,11 @@ use std::cmp::Reverse;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock, Weak};
 
-use tantivy::collector::TopDocs;
-use tantivy::index::SegmentId;
-use tantivy::query::QueryParser;
-use tantivy::schema::{Schema, FAST, TEXT};
-use tantivy::{
+use lucivy::collector::TopDocs;
+use lucivy::index::SegmentId;
+use lucivy::query::QueryParser;
+use lucivy::schema::{Schema, FAST, TEXT};
+use lucivy::{
     doc, DocAddress, DocId, Index, IndexWriter, Opstamp, Searcher, SearcherGeneration,
     SegmentReader, Warmer,
 };
@@ -49,7 +49,7 @@ impl DynamicPriceColumn {
     }
 }
 impl Warmer for DynamicPriceColumn {
-    fn warm(&self, searcher: &Searcher) -> tantivy::Result<()> {
+    fn warm(&self, searcher: &Searcher) -> lucivy::Result<()> {
         for segment in searcher.segment_readers() {
             let product_id_reader = segment
                 .fast_fields()
@@ -122,7 +122,7 @@ impl PriceFetcher for ExternalPriceTable {
     }
 }
 
-fn main() -> tantivy::Result<()> {
+fn main() -> lucivy::Result<()> {
     // Declaring our schema.
     let mut schema_builder = Schema::builder();
     // The product id is assumed to be a primary id for our external price source.

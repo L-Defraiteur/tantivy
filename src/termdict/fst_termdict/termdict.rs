@@ -120,7 +120,7 @@ static EMPTY_TERM_DICT_FILE: Lazy<FileSlice> = Lazy::new(|| {
 });
 
 /// The term dictionary contains all of the terms in
-/// `tantivy index` in a sorted manner.
+/// `lucivy index` in a sorted manner.
 ///
 /// The `Fst` crate is used to associate terms to their
 /// respective `TermOrdinal`. The `TermInfoStore` then makes it

@@ -29,7 +29,7 @@ use crate::aggregation::agg_result::{
 };
 use crate::aggregation::bucket::TermsAggregationInternal;
 use crate::aggregation::metric::CardinalityCollector;
-use crate::TantivyError;
+use crate::LucivyError;
 
 /// Contains the intermediate aggregation result, which is optimized to be merged with other
 /// intermediate results.
@@ -129,7 +129,7 @@ impl IntermediateAggregationResults {
         let res = self.into_final_result_internal(&req, &mut limits)?;
         let bucket_count = res.get_bucket_count() as u32;
         if bucket_count > limits.get_bucket_limit() {
-            return Err(TantivyError::AggregationError(
+            return Err(LucivyError::AggregationError(
                 AggregationError::BucketLimitExceeded {
                     limit: limits.get_bucket_limit(),
                     current: bucket_count,
@@ -575,7 +575,7 @@ impl IntermediateBucketResult {
                     is_date_agg: _,
                 },
             ) => {
-                let buckets: Result<Vec<IntermediateHistogramBucketEntry>, TantivyError> =
+                let buckets: Result<Vec<IntermediateHistogramBucketEntry>, LucivyError> =
                     buckets_left
                         .drain(..)
                         .merge_join_by(buckets_right, |left, right| {

@@ -1,4 +1,4 @@
-# Releasing a new Tantivy Version
+# Releasing a new Lucivy Version
 
 ## Steps
 

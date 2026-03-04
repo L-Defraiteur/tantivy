@@ -161,7 +161,7 @@ pub(crate) mod tests {
             .err();
         assert!(matches!(
             search_error,
-            Some(crate::TantivyError::SchemaError(msg))
+            Some(crate::LucivyError::SchemaError(msg))
             if msg == "Applied phrase query on field \"text\", which does not have positions \
             indexed"
         ));

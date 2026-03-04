@@ -28,12 +28,12 @@ use crate::{DocAddress, DocId, Order, Score, SegmentReader};
 /// In case of a tie on the sort key, documents are always sorted by ascending `DocAddress`.
 ///
 /// ```rust
-/// use tantivy::collector::TopDocs;
-/// use tantivy::query::QueryParser;
-/// use tantivy::schema::{Schema, TEXT};
-/// use tantivy::{doc, DocAddress, Index};
+/// use lucivy::collector::TopDocs;
+/// use lucivy::query::QueryParser;
+/// use lucivy::schema::{Schema, TEXT};
+/// use lucivy::{doc, DocAddress, Index};
 ///
-/// # fn main() -> tantivy::Result<()> {
+/// # fn main() -> lucivy::Result<()> {
 /// let mut schema_builder = Schema::builder();
 /// let title = schema_builder.add_text_field("title", TEXT);
 /// let schema = schema_builder.build();
@@ -103,12 +103,12 @@ impl TopDocs {
     /// # Example
     ///
     /// ```rust
-    /// use tantivy::collector::TopDocs;
-    /// use tantivy::query::QueryParser;
-    /// use tantivy::schema::{Schema, TEXT};
-    /// use tantivy::{doc, DocAddress, Index};
+    /// use lucivy::collector::TopDocs;
+    /// use lucivy::query::QueryParser;
+    /// use lucivy::schema::{Schema, TEXT};
+    /// use lucivy::{doc, DocAddress, Index};
     ///
-    /// # fn main() -> tantivy::Result<()> {
+    /// # fn main() -> lucivy::Result<()> {
     /// let mut schema_builder = Schema::builder();
     /// let title = schema_builder.add_text_field("title", TEXT);
     /// let schema = schema_builder.build();
@@ -155,13 +155,13 @@ impl TopDocs {
     /// # Example
     ///
     /// ```rust
-    /// # use tantivy::schema::{Schema, FAST, TEXT};
-    /// # use tantivy::{doc, Index, DocAddress, Order};
-    /// # use tantivy::query::{Query, QueryParser};
-    /// use tantivy::Searcher;
-    /// use tantivy::collector::TopDocs;
+    /// # use lucivy::schema::{Schema, FAST, TEXT};
+    /// # use lucivy::{doc, Index, DocAddress, Order};
+    /// # use lucivy::query::{Query, QueryParser};
+    /// use lucivy::Searcher;
+    /// use lucivy::collector::TopDocs;
     ///
-    /// # fn main() -> tantivy::Result<()> {
+    /// # fn main() -> lucivy::Result<()> {
     /// #   let mut schema_builder = Schema::builder();
     /// #   let title = schema_builder.add_text_field("title", TEXT);
     /// #   let rating = schema_builder.add_u64_field("rating", FAST);
@@ -187,7 +187,7 @@ impl TopDocs {
     /// /// given in argument.
     /// fn docs_sorted_by_rating(searcher: &Searcher,
     ///                          query: &dyn Query)
-    ///     -> tantivy::Result<Vec<(Option<u64>, DocAddress)>> {
+    ///     -> lucivy::Result<Vec<(Option<u64>, DocAddress)>> {
     ///
     ///     // This is where we build our topdocs collector
     ///     //
@@ -236,19 +236,19 @@ impl TopDocs {
     /// Note that this method is a generic. The requested fast field type will be often
     /// inferred in your code by the rust compiler.
     ///
-    /// Implementation-wise, for performance reason, tantivy will manipulate the u64 representation
+    /// Implementation-wise, for performance reason, lucivy will manipulate the u64 representation
     /// of your fast field until the last moment.
     ///
     /// # Example
     ///
     /// ```rust
-    /// # use tantivy::schema::{Schema, FAST, TEXT};
-    /// # use tantivy::{doc, Index, DocAddress,Order};
-    /// # use tantivy::query::{Query, AllQuery};
-    /// use tantivy::Searcher;
-    /// use tantivy::collector::TopDocs;
+    /// # use lucivy::schema::{Schema, FAST, TEXT};
+    /// # use lucivy::{doc, Index, DocAddress,Order};
+    /// # use lucivy::query::{Query, AllQuery};
+    /// use lucivy::Searcher;
+    /// use lucivy::collector::TopDocs;
     ///
-    /// # fn main() -> tantivy::Result<()> {
+    /// # fn main() -> lucivy::Result<()> {
     /// #   let mut schema_builder = Schema::builder();
     /// #   let title = schema_builder.add_text_field("company", TEXT);
     /// #   let revenue = schema_builder.add_i64_field("revenue", FAST);
@@ -273,7 +273,7 @@ impl TopDocs {
     /// fn docs_sorted_by_revenue(searcher: &Searcher,
     ///                          query: &dyn Query,
     ///                          revenue_field: &str)
-    ///     -> tantivy::Result<Vec<(Option<i64>, DocAddress)>> {
+    ///     -> lucivy::Result<Vec<(Option<i64>, DocAddress)>> {
     ///
     ///     // This is where we build our topdocs collector
     ///     //
@@ -355,12 +355,12 @@ impl TopDocs {
     /// learning-to-rank model over various features
     ///
     /// ```rust
-    /// # use tantivy::schema::{Schema, FAST, TEXT};
-    /// # use tantivy::{doc, Index, DocAddress, DocId, Score};
-    /// # use tantivy::query::QueryParser;
-    /// use tantivy::SegmentReader;
-    /// use tantivy::collector::TopDocs;
-    /// use tantivy::schema::Field;
+    /// # use lucivy::schema::{Schema, FAST, TEXT};
+    /// # use lucivy::{doc, Index, DocAddress, DocId, Score};
+    /// # use lucivy::query::QueryParser;
+    /// use lucivy::SegmentReader;
+    /// use lucivy::collector::TopDocs;
+    /// use lucivy::schema::Field;
     ///
     /// fn create_schema() -> Schema {
     ///    let mut schema_builder = Schema::builder();
@@ -369,7 +369,7 @@ impl TopDocs {
     ///    schema_builder.build()
     /// }
     ///
-    /// fn create_index() -> tantivy::Result<Index> {
+    /// fn create_index() -> lucivy::Result<Index> {
     ///   let schema = create_schema();
     ///   let index = Index::create_in_ram(schema);
     ///   let mut index_writer = index.writer_with_num_threads(1, 20_000_000)?;
@@ -1501,7 +1501,7 @@ mod tests {
         let segment = searcher.segment_reader(0);
         let top_collector = TopDocs::with_limit(4).order_by_u64_field(SIZE, Order::Desc);
         let err = top_collector.for_segment(0, segment).err().unwrap();
-        assert!(matches!(err, crate::TantivyError::InvalidArgument(_)));
+        assert!(matches!(err, crate::LucivyError::InvalidArgument(_)));
         Ok(())
     }
 
@@ -1513,7 +1513,7 @@ mod tests {
         let top_collector = TopDocs::with_limit(4).order_by_fast_field::<i64>(SIZE, Order::Desc);
         let err = top_collector.check_schema(&schema).err().unwrap();
         assert!(
-            matches!(err, crate::TantivyError::SchemaError(msg) if msg == "Field `size` is not a fast field.")
+            matches!(err, crate::LucivyError::SchemaError(msg) if msg == "Field `size` is not a fast field.")
         );
     }
 

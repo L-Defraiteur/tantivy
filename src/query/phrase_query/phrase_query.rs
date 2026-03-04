@@ -124,7 +124,7 @@ impl PhraseQuery {
             .unwrap_or(false);
         if !has_positions {
             let field_name = field_entry.name();
-            return Err(crate::TantivyError::SchemaError(format!(
+            return Err(crate::LucivyError::SchemaError(format!(
                 "Applied phrase query on field {field_name:?}, which does not have positions \
                  indexed"
             )));

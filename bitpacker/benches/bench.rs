@@ -6,7 +6,7 @@ extern crate test;
 mod tests {
     use rand::seq::IteratorRandom;
     use rand::thread_rng;
-    use tantivy_bitpacker::{BitPacker, BitUnpacker, BlockedBitpacker};
+    use lucivy_bitpacker::{BitPacker, BitUnpacker, BlockedBitpacker};
     use test::Bencher;
 
     #[inline(never)]

@@ -1,7 +1,7 @@
 use ahash::AHashMap;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use rand_distr::Exp;
-use tantivy_stacker::ArenaHashMap;
+use lucivy_stacker::ArenaHashMap;
 
 fn main() {
     for _ in 0..1_000_000 {

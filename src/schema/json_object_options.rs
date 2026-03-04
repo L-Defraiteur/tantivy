@@ -16,7 +16,7 @@ pub struct JsonObjectOptions {
     indexing: Option<TextFieldIndexing>,
     // Store all field as fast fields with an optional tokenizer for text.
     fast: FastFieldTextOptions,
-    /// tantivy will generate paths to the different nodes of the json object
+    /// lucivy will generate paths to the different nodes of the json object
     /// both in:
     /// - the inverted index (for the terms)
     /// - fast fields (for the column names).

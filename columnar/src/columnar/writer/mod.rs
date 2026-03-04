@@ -36,7 +36,7 @@ struct SpareBuffers {
 /// Makes it possible to create a new columnar.
 ///
 /// ```rust
-/// use tantivy_columnar::ColumnarWriter;
+/// use lucivy_columnar::ColumnarWriter;
 ///
 /// let mut columnar_writer = ColumnarWriter::default();
 /// columnar_writer.record_str(0u32 /* doc id */, "product_name", "Red backpack");
@@ -289,7 +289,7 @@ impl ColumnarWriter {
         let mut symbol_byte_buffer: Vec<u8> = Vec::new();
         for (column_name, column_type, addr) in columns {
             if column_name.contains(&JSON_END_OF_PATH) {
-                // Tantivy uses b'0' as a separator for nested fields in JSON.
+                // Lucivy uses b'0' as a separator for nested fields in JSON.
                 // Column names with a b'0' are not simply ignored by the columnar (and the inverted
                 // index).
                 continue;

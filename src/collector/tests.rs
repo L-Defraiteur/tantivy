@@ -5,7 +5,7 @@ use crate::query::{AllQuery, QueryParser};
 use crate::schema::{Schema, FAST, TEXT};
 use crate::time::format_description::well_known::Rfc3339;
 use crate::time::OffsetDateTime;
-use crate::{DateTime, DocAddress, Index, Searcher, TantivyDocument};
+use crate::{DateTime, DocAddress, Index, Searcher, LucivyDocument};
 
 pub const TEST_COLLECTOR_WITH_SCORE: TestCollector = TestCollector {
     compute_score: true,
@@ -285,8 +285,8 @@ fn make_test_searcher() -> crate::Result<Searcher> {
     let schema = Schema::builder().build();
     let index = Index::create_in_ram(schema);
     let mut index_writer = index.writer_for_tests()?;
-    index_writer.add_document(TantivyDocument::default())?;
-    index_writer.add_document(TantivyDocument::default())?;
+    index_writer.add_document(LucivyDocument::default())?;
+    index_writer.add_document(LucivyDocument::default())?;
     index_writer.commit()?;
     Ok(index.reader()?.searcher())
 }

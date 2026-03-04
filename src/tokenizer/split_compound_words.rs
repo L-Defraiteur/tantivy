@@ -18,7 +18,7 @@ use super::{Token, TokenFilter, TokenStream, Tokenizer};
 /// is not split in the following example.
 ///
 /// ```rust
-/// use tantivy::tokenizer::{SimpleTokenizer, SplitCompoundWords, TextAnalyzer};
+/// use lucivy::tokenizer::{SimpleTokenizer, SplitCompoundWords, TextAnalyzer};
 ///
 /// let mut tokenizer =
 ///        TextAnalyzer::builder(SimpleTokenizer::default())
@@ -62,7 +62,7 @@ impl SplitCompoundWords {
             .match_kind(MatchKind::LeftmostLongest)
             .build(dict)
             .map_err(|err| {
-                crate::TantivyError::InvalidArgument(format!(
+                crate::LucivyError::InvalidArgument(format!(
                     "Failed to build Aho-Corasick automaton from dictionary: {err}"
                 ))
             })?;

@@ -5,7 +5,7 @@ use std::net::Ipv6Addr;
 use columnar::MonotonicallyMappableToU128;
 use common::{read_u32_vint_no_advance, serialize_vint_u32, BinarySerializable, DateTime, VInt};
 use serde_json::Map;
-pub use CompactDoc as TantivyDocument;
+pub use CompactDoc as LucivyDocument;
 
 use super::{ReferenceValue, ReferenceValueLeaf, Value};
 use crate::schema::document::{
@@ -17,14 +17,14 @@ use crate::tokenizer::PreTokenizedString;
 
 #[repr(C, packed)]
 #[derive(Debug, Clone)]
-/// A field value pair in the compact tantivy document
+/// A field value pair in the compact lucivy document
 struct FieldValueAddr {
     pub field: u16,
     pub value_addr: ValueAddr,
 }
 
 #[derive(Debug, Clone)]
-/// The default document in tantivy. It encodes data in a compact form.
+/// The default document in lucivy. It encodes data in a compact form.
 pub struct CompactDoc {
     /// `node_data` is a vec of bytes, where each value is serialized into bytes and stored. It
     /// includes all the data of the document and also metadata like where the nodes are located
@@ -506,7 +506,7 @@ impl std::fmt::Debug for ValueAddr {
     }
 }
 
-/// A enum representing a value for tantivy to index.
+/// A enum representing a value for lucivy to index.
 ///
 /// ** Any changes need to be reflected in `BinarySerializable` for `ValueType` **
 ///
@@ -723,7 +723,7 @@ mod tests {
     fn test_doc() {
         let mut schema_builder = Schema::builder();
         let text_field = schema_builder.add_text_field("title", TEXT);
-        let mut doc = TantivyDocument::default();
+        let mut doc = LucivyDocument::default();
         doc.add_text(text_field, "My title");
         assert_eq!(doc.field_values().count(), 1);
 
@@ -751,7 +751,7 @@ mod tests {
 
         let mut schema_builder = Schema::builder();
         let json_field = schema_builder.add_json_field("json", TEXT);
-        let mut doc = TantivyDocument::default();
+        let mut doc = LucivyDocument::default();
         doc.add_object(json_field, json_val);
 
         let schema = schema_builder.build();

@@ -1,6 +1,6 @@
 ---
 name: Question
-about: Ask any question about tantivy's usage...
+about: Ask any question about lucivy's usage...
 
 ---
 

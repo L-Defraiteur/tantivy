@@ -4,10 +4,10 @@ use crate::indexer::operation::AddOperation;
 use crate::indexer::segment_updater::save_metas;
 use crate::indexer::SegmentWriter;
 use crate::schema::document::Document;
-use crate::{Directory, Index, IndexMeta, Opstamp, Segment, TantivyDocument};
+use crate::{Directory, Index, IndexMeta, Opstamp, Segment, LucivyDocument};
 
 #[doc(hidden)]
-pub struct SingleSegmentIndexWriter<D: Document = TantivyDocument> {
+pub struct SingleSegmentIndexWriter<D: Document = LucivyDocument> {
     segment_writer: SegmentWriter,
     segment: Segment,
     opstamp: Opstamp,

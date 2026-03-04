@@ -1,5 +1,5 @@
 [package]
-name = "ld-tantivy"
+name = "ld-lucivy"
 version = "0.26.0"
 authors = ["Paul Masurel <paul.masurel@gmail.com>"]
 license = "MIT"
@@ -7,7 +7,7 @@ categories = ["database-implementations", "data-structures"]
 description = """Search engine library"""
 documentation = "https://docs.rs/tantivy/"
 homepage = "https://github.com/quickwit-oss/tantivy"
-repository = "https://github.com/L-Defraiteur/tantivy"
+repository = "https://github.com/L-Defraiteur/lucivy"
 readme = "README.md"
 keywords = ["search", "information", "retrieval"]
 edition = "2024"
@@ -63,13 +63,13 @@ measure_time = "0.9.0"
 arc-swap = "1.5.0"
 bon = "3.3.1"
 
-columnar = { version = "0.26.0", path = "./columnar", package = "ld-tantivy-columnar" }
-sstable = { version = "0.26.0", path = "./sstable", package = "ld-tantivy-sstable", optional = true }
-stacker = { version = "0.26.0", path = "./stacker", package = "ld-tantivy-stacker" }
-query-grammar = { version = "0.26.0", path = "./query-grammar", package = "ld-tantivy-query-grammar" }
-tantivy-bitpacker = { version = "0.26.0", path = "./bitpacker", package = "ld-tantivy-bitpacker" }
-common = { version = "0.26.0", path = "./common/", package = "ld-tantivy-common" }
-tokenizer-api = { version = "0.26.0", path = "./tokenizer-api", package = "ld-tantivy-tokenizer-api" }
+columnar = { version = "0.26.0", path = "./columnar", package = "ld-lucivy-columnar" }
+sstable = { version = "0.26.0", path = "./sstable", package = "ld-lucivy-sstable", optional = true }
+stacker = { version = "0.26.0", path = "./stacker", package = "ld-lucivy-stacker" }
+query-grammar = { version = "0.26.0", path = "./query-grammar", package = "ld-lucivy-query-grammar" }
+lucivy-bitpacker = { version = "0.26.0", path = "./bitpacker", package = "ld-lucivy-bitpacker" }
+common = { version = "0.26.0", path = "./common/", package = "ld-lucivy-common" }
+tokenizer-api = { version = "0.26.0", path = "./tokenizer-api", package = "ld-lucivy-tokenizer-api" }
 sketches-ddsketch = { version = "0.3.0", features = ["use_serde"] }
 hyperloglogplus = { version = "0.4.1", features = ["const-loop"] }
 futures-util = { version = "0.3.28", optional = true }
@@ -150,7 +150,7 @@ members = [
     "sstable",
     "tokenizer-api",
     "columnar",
-    "tantivy_fts/rust",
+    "lucivy_fts/rust",
     "lucivy",
 ]
 

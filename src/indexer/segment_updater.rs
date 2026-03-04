@@ -24,7 +24,7 @@ use crate::indexer::{
     DefaultMergePolicy, MergeCandidate, MergeOperation, MergePolicy, SegmentEntry,
     SegmentSerializer,
 };
-use crate::{FutureResult, Opstamp, TantivyError};
+use crate::{FutureResult, Opstamp, LucivyError};
 
 const PANIC_CAUGHT: &str = "Panic caught in merge thread";
 
@@ -34,13 +34,13 @@ const PANIC_CAUGHT: &str = "Panic caught in merge thread";
 /// - it fails, in which case an error is returned, and the `meta.json` remains untouched,
 /// - it success, and `meta.json` is written and flushed.
 ///
-/// This method is not part of tantivy's public API
+/// This method is not part of lucivy's public API
 pub(crate) fn save_metas(metas: &IndexMeta, directory: &dyn Directory) -> crate::Result<()> {
     info!("save metas");
     let mut buffer = serde_json::to_vec_pretty(metas)?;
     // Just adding a new line at the end of the buffer.
     writeln!(&mut buffer)?;
-    crate::fail_point!("save_metas", |msg| Err(crate::TantivyError::from(
+    crate::fail_point!("save_metas", |msg| Err(crate::LucivyError::from(
         std::io::Error::new(
             std::io::ErrorKind::Other,
             msg.unwrap_or_else(|| "Undefined".to_string())
@@ -129,7 +129,7 @@ fn merge(
 
 /// Advanced: Merges a list of segments from different indices in a new index.
 ///
-/// Returns `TantivyError` if the indices list is empty or their
+/// Returns `LucivyError` if the indices list is empty or their
 /// schemas don't match.
 ///
 /// `output_directory`: is assumed to be empty.
@@ -145,7 +145,7 @@ pub fn merge_indices<T: Into<Box<dyn Directory>>>(
 ) -> crate::Result<Index> {
     if indices.is_empty() {
         // If there are no indices to merge, there is no need to do anything.
-        return Err(crate::TantivyError::InvalidArgument(
+        return Err(crate::LucivyError::InvalidArgument(
             "No indices given to merge".to_string(),
         ));
     }
@@ -158,7 +158,7 @@ pub fn merge_indices<T: Into<Box<dyn Directory>>>(
         .skip(1)
         .any(|index| index.settings() != &target_settings)
     {
-        return Err(crate::TantivyError::InvalidArgument(
+        return Err(crate::LucivyError::InvalidArgument(
             "Attempt to merge indices with different index_settings".to_string(),
         ));
     }
@@ -175,7 +175,7 @@ pub fn merge_indices<T: Into<Box<dyn Directory>>>(
 /// Advanced: Merges a list of segments from different indices in a new index.
 /// Additional you can provide a delete bitset for each segment to ignore doc_ids.
 ///
-/// Returns `TantivyError` if the indices list is empty or their
+/// Returns `LucivyError` if the indices list is empty or their
 /// schemas don't match.
 ///
 /// `output_directory`: is assumed to be empty.
@@ -193,7 +193,7 @@ pub fn merge_filtered_segments<T: Into<Box<dyn Directory>>>(
 ) -> crate::Result<Index> {
     if segments.is_empty() {
         // If there are no indices to merge, there is no need to do anything.
-        return Err(crate::TantivyError::InvalidArgument(
+        return Err(crate::LucivyError::InvalidArgument(
             "No segments given to merge".to_string(),
         ));
     }
@@ -206,7 +206,7 @@ pub fn merge_filtered_segments<T: Into<Box<dyn Directory>>>(
         .skip(1)
         .any(|index| index.schema() != target_schema)
     {
-        return Err(crate::TantivyError::InvalidArgument(
+        return Err(crate::LucivyError::InvalidArgument(
             "Attempt to merge different schema indices".to_string(),
         ));
     }
@@ -283,7 +283,7 @@ impl SegmentUpdater {
             .num_threads(1)
             .build()
             .map_err(|_| {
-                crate::TantivyError::SystemError(
+                crate::LucivyError::SystemError(
                     "Failed to spawn segment updater thread".to_string(),
                 )
             })?;
@@ -301,7 +301,7 @@ impl SegmentUpdater {
             })
             .build()
             .map_err(|_| {
-                crate::TantivyError::SystemError(
+                crate::LucivyError::SystemError(
                     "Failed to spawn segment merging thread".to_string(),
                 )
             })?;
@@ -333,7 +333,7 @@ impl SegmentUpdater {
         task: F,
     ) -> FutureResult<T> {
         if !self.is_alive() {
-            return crate::TantivyError::SystemError("Segment updater killed".to_string()).into();
+            return crate::LucivyError::SystemError("Segment updater killed".to_string()).into();
         }
         let (scheduled_result, sender) = FutureResult::create(
             "A segment_updater future did not succeed. This should never happen.",
@@ -534,7 +534,7 @@ impl SegmentUpdater {
                     } else {
                         "UNKNOWN"
                     };
-                    let _send_result = merging_future_send.send(Err(TantivyError::SystemError(
+                    let _send_result = merging_future_send.send(Err(LucivyError::SystemError(
                         format!("Merge thread panicked: {panic_str}"),
                     )));
                     // Resume unwinding because we forced unwind safety with

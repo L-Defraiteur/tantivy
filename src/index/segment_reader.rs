@@ -99,7 +99,7 @@ impl SegmentReader {
         let field = schema.get_field(field_name)?;
         let field_entry = schema.get_field_entry(field);
         if field_entry.field_type().value_type() != Type::Facet {
-            return Err(crate::TantivyError::SchemaError(format!(
+            return Err(crate::LucivyError::SchemaError(format!(
                 "`{field_name}` is not a facet field.`"
             )));
         }
@@ -112,7 +112,7 @@ impl SegmentReader {
     /// Accessor to the segment's `Field norms`'s reader.
     ///
     /// Field norms are the length (in tokens) of the fields.
-    /// It is used in the computation of the [TfIdf](https://fulmicoton.gitbooks.io/tantivy-doc/content/tfidf.html).
+    /// It is used in the computation of the [TfIdf](https://fulmicoton.gitbooks.io/lucivy-doc/content/tfidf.html).
     ///
     /// They are simply stored as a fast field, serialized in
     /// the `.fieldnorm` file of the segment.
@@ -123,7 +123,7 @@ impl SegmentReader {
                 "Field norm not found for field {field_name:?}. Was the field set to record norm \
                  during indexing?"
             );
-            crate::TantivyError::SchemaError(err_msg)
+            crate::LucivyError::SchemaError(err_msg)
         })
     }
 
@@ -932,7 +932,7 @@ mod test {
 
         {
             let mut index_writer: IndexWriter = index.writer_for_tests()?;
-            index_writer.add_document(doc!(name => "tantivy"))?;
+            index_writer.add_document(doc!(name => "lucivy"))?;
             index_writer.add_document(doc!(name => "horse"))?;
             index_writer.add_document(doc!(name => "jockey"))?;
             index_writer.add_document(doc!(name => "cap"))?;
@@ -959,7 +959,7 @@ mod test {
 
         {
             let mut index_writer: IndexWriter = index.writer_for_tests()?;
-            index_writer.add_document(doc!(name => "tantivy"))?;
+            index_writer.add_document(doc!(name => "lucivy"))?;
             index_writer.add_document(doc!(name => "horse"))?;
             index_writer.add_document(doc!(name => "jockey"))?;
             index_writer.add_document(doc!(name => "cap"))?;

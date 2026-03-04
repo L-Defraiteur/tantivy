@@ -20,7 +20,7 @@ impl IntoIpv6Addr for IpAddr {
     }
 }
 
-/// Define how an ip field should be handled by tantivy.
+/// Define how an ip field should be handled by lucivy.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct IpAddrOptions {
     fast: bool,
