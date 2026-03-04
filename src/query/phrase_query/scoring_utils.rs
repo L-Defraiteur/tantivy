@@ -23,6 +23,7 @@ type HighlightKey = (u32, DocId);
 /// After search, the caller reads the sink to populate highlights per field.
 #[derive(Debug)]
 pub struct HighlightSink {
+    #[allow(clippy::type_complexity)]
     data: Mutex<HashMap<HighlightKey, Vec<(String, usize, usize)>>>,
     segment_counter: AtomicU32,
 }

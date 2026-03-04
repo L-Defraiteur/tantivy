@@ -27,8 +27,6 @@ pub fn intersect_scorers(
     }
     // Order by estimated cost to drive each scorer.
     scorers.sort_by_key(|scorer| scorer.cost());
-    for (i, s) in scorers.iter().enumerate() {
-    }
     let doc = go_to_first_doc(&mut scorers[..]);
     if doc == TERMINATED {
         return Box::new(EmptyScorer);
@@ -67,7 +65,7 @@ fn go_to_first_doc<TDocSet: DocSet>(docsets: &mut [TDocSet]) -> DocId {
     assert!(!docsets.is_empty());
     let mut candidate = docsets.iter().map(TDocSet::doc).max().unwrap();
     'outer: loop {
-        for (i, docset) in docsets.iter_mut().enumerate() {
+        for docset in docsets.iter_mut() {
             let seek_doc = docset.seek(candidate);
             if seek_doc > candidate {
                 candidate = docset.doc();

@@ -99,6 +99,7 @@ fn ngram_candidates_for_token(
 
 /// Parameters for fuzzy substring verification.
 #[derive(Clone, Debug)]
+#[allow(missing_docs)]
 pub struct FuzzyParams {
     pub tokens: Vec<String>,
     pub separators: Vec<String>,
@@ -724,7 +725,6 @@ impl NgramContainsScorer {
 
 impl DocSet for NgramContainsScorer {
     fn advance(&mut self) -> DocId {
-        let before_doc = self.doc();
         loop {
             self.cursor += 1;
             let doc = self.doc();
@@ -735,7 +735,6 @@ impl DocSet for NgramContainsScorer {
     }
 
     fn seek(&mut self, target: DocId) -> DocId {
-        let before_doc = self.doc();
         while self.cursor < self.candidates.len() && self.candidates[self.cursor] < target {
             self.cursor += 1;
         }

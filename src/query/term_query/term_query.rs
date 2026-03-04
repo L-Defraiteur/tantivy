@@ -83,6 +83,7 @@ impl TermQuery {
         }
     }
 
+    /// Attach a highlight sink to capture byte offsets during scoring.
     pub fn with_highlight_sink(mut self, sink: Arc<HighlightSink>, field_name: String) -> Self {
         self.highlight_sink = Some(sink);
         self.highlight_field_name = field_name;
