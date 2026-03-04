@@ -96,14 +96,20 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install maturin
-        run: pip install maturin
+      - name: Install maturin + create venv
+        run: |
+          python3 -m venv .venv
+          . .venv/bin/activate
+          pip install maturin
 
       - name: Build lucivy
-        run: cd lucivy && maturin develop --release
+        run: |
+          . .venv/bin/activate
+          cd lucivy && maturin develop --release
 
       - name: Test lucivy
         run: |
+          . .venv/bin/activate
           python3 -c "
           import lucivy
 
