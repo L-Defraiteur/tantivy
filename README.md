@@ -1,12 +1,6 @@
 # lucivy
 
-Fork of [tantivy](https://github.com/quickwit-oss/tantivy) v0.26.0 — a fast full-text search engine in Rust — with **fuzzy substring search**, **contains_split multi-word matching**, **trigram-accelerated regex**, and **BM25 scoring**. Designed for code search, technical docs, and mixed-language content where exact matching fails.
-
-```
-quickwit-oss/tantivy v0.22
-  -> izihawa/tantivy v0.26.0
-    -> L-Defraiteur/lucivy (this fork)
-```
+BM25 search engine with cross-token fuzzy matching — it finds substrings, handles typos, and matches across word boundaries. Built for code search, technical docs, and as a BM25 complement to vector databases.
 
 ## Python package
 
@@ -271,9 +265,13 @@ Also used by [lucivy_fts](../../lucivy_fts/), a cxx FFI crate that exposes full-
 
 ## Lineage
 
-- [quickwit-oss/tantivy](https://github.com/quickwit-oss/tantivy) — original full-text search engine in Rust
-- [izihawa/tantivy](https://github.com/izihawa/tantivy) — v0.26.0 fork with regex phrase queries, FST improvements
-- **L-Defraiteur/lucivy** — this fork: NgramContainsQuery, contains_split, fuzzy + regex + hybrid modes, BM25, HighlightSink, byte offsets, Python bindings
+Fork of [tantivy](https://github.com/quickwit-oss/tantivy) v0.26.0 (via [izihawa/tantivy](https://github.com/izihawa/tantivy)).
+
+```
+quickwit-oss/tantivy v0.22
+  -> izihawa/tantivy v0.26.0 (regex phrase queries, FST improvements)
+    -> L-Defraiteur/lucivy (NgramContainsQuery, contains_split, fuzzy/regex/hybrid modes, HighlightSink, Python bindings)
+```
 
 ## License
 
