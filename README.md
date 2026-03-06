@@ -222,15 +222,6 @@ Three verification modes:
 | `python\|rust` | `"Python is versatile"` | yes | alternation |
 | `v[0-9]+` | `"version v2.0 released"` | yes | full-scan fallback (literal < 3 chars) |
 
-### FST-based fallback
-
-When no `._ngram` field is available, `contains` falls back to a 4-level cascade on the term dictionary:
-
-1. **Exact** — term dict lookup
-2. **Fuzzy** — Levenshtein automaton
-3. **Substring** — regex `.*token.*`
-4. **Fuzzy substring** — combined Levenshtein + substring automaton
-
 ### HighlightSink
 
 Thread-safe side-channel for capturing match byte offsets during scoring. Zero extra cost — offsets are captured as a byproduct of existing verification.
