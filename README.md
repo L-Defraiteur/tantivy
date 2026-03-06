@@ -117,9 +117,28 @@ index.search({"type": "contains_split", "field": "body", "value": "memory safety
 index.search({"type": "contains_split", "field": "body", "value": "memry safty", "distance": 1})
 ```
 
-**`boolean`** — combine sub-queries with must (AND), should (OR), must_not (NOT).
+**`boolean`** — combine sub-queries with must (AND), should (OR), must_not (NOT). This replaces Lucene-style `parse` queries (`"rust AND programming NOT javascript"`) with cross-token matching.
 
 ```python
+# AND: docs must contain both "rust" and "programming" (as substrings, fuzzy)
+index.search({
+    "type": "boolean",
+    "must": [
+        {"type": "contains", "field": "body", "value": "rust"},
+        {"type": "contains", "field": "body", "value": "programming"},
+    ],
+})
+
+# OR: docs matching either "python" or "rust"
+index.search({
+    "type": "boolean",
+    "should": [
+        {"type": "contains", "field": "body", "value": "python"},
+        {"type": "contains", "field": "body", "value": "rust"},
+    ],
+})
+
+# NOT: docs about "web" but not "javascript"
 index.search({
     "type": "boolean",
     "must": [{"type": "contains", "field": "body", "value": "web"}],
