@@ -127,20 +127,19 @@ index.search({
 })
 ```
 
-#### Per-token queries (advanced)
+#### Per-token queries (legacy)
 
-These operate on **individual tokens** in the inverted index. They cannot match across token boundaries.
+These operate on **individual tokens** in the inverted index. They cannot match across token boundaries. **Prefer `contains` for all new code** — it handles everything these do, plus cross-token matching and substrings.
 
-| Type | Use case | Example |
-|------|----------|---------|
-| `fuzzy` | Single-word Levenshtein | `{"type": "fuzzy", "field": "title", "value": "pythn", "distance": 1}` |
-| `regex` | Regex on single tokens | `{"type": "regex", "field": "body", "pattern": "program.*"}` |
-| `term` | Exact token lookup | `{"type": "term", "field": "title", "value": "rust"}` |
-| `phrase` | Exact phrase (stemmed) | `{"type": "phrase", "field": "body", "terms": ["rust", "programming"]}` |
-| `parse` | Query parser syntax | `{"type": "parse", "field": "body", "value": "rust AND programming"}` |
+The only per-token query that remains useful is `parse`, which provides Lucene-style query syntax (`AND`, `OR`, `NOT`, field selectors).
 
-> **When to use per-token vs cross-token?**
-> Use `contains` (cross-token) for almost everything. Use per-token queries only when you specifically need inverted index behavior (e.g. exact token lookup, or query parser syntax).
+| Type | Example |
+|------|---------|
+| `parse` | `{"type": "parse", "field": "body", "value": "rust AND programming"}` |
+| `fuzzy` | `{"type": "fuzzy", "field": "title", "value": "pythn", "distance": 1}` |
+| `regex` | `{"type": "regex", "field": "body", "pattern": "program.*"}` |
+| `term` | `{"type": "term", "field": "title", "value": "rust"}` |
+| `phrase` | `{"type": "phrase", "field": "body", "terms": ["rust", "programming"]}` |
 
 #### Filters on non-text fields
 
