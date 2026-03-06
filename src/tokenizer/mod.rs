@@ -143,7 +143,7 @@ mod stemmer;
 pub use tokenizer_api::{BoxTokenStream, Token, TokenFilter, TokenStream, Tokenizer};
 
 pub use self::alphanum_only::AlphaNumOnlyFilter;
-pub use self::ascii_folding_filter::AsciiFoldingFilter;
+pub use self::ascii_folding_filter::{AsciiFoldingFilter, to_ascii};
 pub use self::facet_tokenizer::FacetTokenizer;
 pub use self::lower_caser::LowerCaser;
 pub use self::ngram_tokenizer::NgramTokenizer;

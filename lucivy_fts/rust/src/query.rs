@@ -428,8 +428,11 @@ fn build_contains_regex(
     let pattern = config.value.as_deref().ok_or("contains regex query requires 'value'")?;
     let fuzzy_distance = config.distance.unwrap_or(0); // regex default: no fuzzy
 
-    // 1. Compile the regex (case-insensitive for stored text matching).
-    let compiled = Regex::new(&format!("(?i){pattern}"))
+    // 1. Fold the pattern to ASCII (ç→c, é→e) for accent-insensitive matching.
+    //    The scorer folds stored text before running the regex, so the pattern must also be folded.
+    let mut folded_pattern = String::new();
+    ld_lucivy::tokenizer::to_ascii(pattern, &mut folded_pattern);
+    let compiled = Regex::new(&format!("(?i){folded_pattern}"))
         .map_err(|e| format!("invalid regex pattern: {e}"))?;
 
     // 2. Parse HIR and extract obligatory literals.

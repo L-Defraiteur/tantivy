@@ -84,20 +84,26 @@ impl HighlightSink {
 
 /// Re-tokenize raw text into (byte_offset_from, byte_offset_to) pairs.
 /// Splits on non-alphanumeric characters (mirrors the default tokenizer).
+/// Uses `char::is_alphanumeric()` to correctly handle Unicode letters (ç, é, etc.).
 pub(crate) fn tokenize_raw(text: &str) -> Vec<(usize, usize)> {
-    let bytes = text.as_bytes();
     let mut tokens = Vec::new();
-    let mut i = 0;
-    while i < bytes.len() {
-        if !bytes[i].is_ascii_alphanumeric() {
-            i += 1;
+    let mut chars = text.char_indices().peekable();
+    while let Some(&(i, c)) = chars.peek() {
+        if !c.is_alphanumeric() {
+            chars.next();
             continue;
         }
         let start = i;
-        while i < bytes.len() && bytes[i].is_ascii_alphanumeric() {
-            i += 1;
+        let mut end = i + c.len_utf8();
+        chars.next();
+        while let Some(&(j, c2)) = chars.peek() {
+            if !c2.is_alphanumeric() {
+                break;
+            }
+            end = j + c2.len_utf8();
+            chars.next();
         }
-        tokens.push((start, i));
+        tokens.push((start, end));
     }
     tokens
 }
@@ -153,27 +159,34 @@ pub(crate) fn contains_fuzzy_substring(text: &str, pattern: &str, max_d: u32) ->
 
 /// Check if a doc token matches a query token via exact, substring, fuzzy, or fuzzy substring.
 /// Returns the match distance (0 for exact/substring, d for fuzzy).
+/// Applies ASCII folding (ç→c, é→e) so that accent differences don't count as edits.
 pub(crate) fn token_match_distance(
     doc_token: &str,
     query_token: &str,
     fuzzy_distance: u8,
 ) -> Option<u32> {
+    // Fold accents for accent-insensitive comparison.
+    let mut doc_buf = String::new();
+    crate::tokenizer::to_ascii(doc_token, &mut doc_buf);
+    let mut query_buf = String::new();
+    crate::tokenizer::to_ascii(query_token, &mut query_buf);
+
     // Exact
-    if doc_token == query_token {
+    if doc_buf == query_buf {
         return Some(0);
     }
     // Query is substring of doc token (e.g. "program" in "programming")
-    if doc_token.contains(query_token) {
+    if doc_buf.contains(query_buf.as_str()) {
         return Some(0);
     }
     if fuzzy_distance > 0 {
         // Fuzzy whole-word
-        let d = edit_distance(doc_token, query_token);
+        let d = edit_distance(&doc_buf, &query_buf);
         if d <= fuzzy_distance as u32 {
             return Some(d);
         }
         // Fuzzy substring (e.g. "progam" ≈ substring of "programming")
-        if contains_fuzzy_substring(doc_token, query_token, fuzzy_distance as u32) {
+        if contains_fuzzy_substring(&doc_buf, &query_buf, fuzzy_distance as u32) {
             return Some(fuzzy_distance as u32);
         }
     }
@@ -186,15 +199,50 @@ const NGRAM_SIZE: usize = 3;
 
 /// Generate character-level trigrams from a token.
 /// Tokens shorter than 3 are returned as-is.
+/// Applies ASCII folding (ç→c, é→e) to match the ngram index tokenizer.
 pub(crate) fn generate_trigrams(token: &str) -> Vec<String> {
-    let chars: Vec<char> = token.chars().collect();
+    let mut buf = String::new();
+    crate::tokenizer::to_ascii(token, &mut buf);
+    let folded = if buf.is_empty() && !token.is_empty() {
+        // to_ascii clears buf then writes; if input is all-ASCII, buf == token
+        token
+    } else {
+        &buf
+    };
+    let chars: Vec<char> = folded.chars().collect();
     if chars.len() < NGRAM_SIZE {
-        return vec![token.to_string()];
+        return vec![folded.to_string()];
     }
     chars
         .windows(NGRAM_SIZE)
         .map(|w| w.iter().collect())
         .collect()
+}
+
+/// Fold text to ASCII and build a byte offset map (folded position → original position).
+///
+/// For a regex match at `[s, e)` in the folded text, the corresponding span in the
+/// original text is `[map[s], map[e])`.
+pub(crate) fn fold_with_byte_map(text: &str) -> (String, Vec<usize>) {
+    let mut folded = String::new();
+    let mut map = Vec::with_capacity(text.len() + 1);
+    let mut char_buf = String::with_capacity(4);
+    let mut fold_buf = String::with_capacity(8);
+
+    for (orig_byte, c) in text.char_indices() {
+        char_buf.clear();
+        char_buf.push(c);
+        fold_buf.clear();
+        crate::tokenizer::to_ascii(&char_buf, &mut fold_buf);
+
+        // Each folded byte maps back to the original char's start byte.
+        for _ in fold_buf.as_bytes() {
+            map.push(orig_byte);
+        }
+        folded.push_str(&fold_buf);
+    }
+    map.push(text.len()); // sentinel for end-of-string
+    (folded, map)
 }
 
 /// Minimum number of shared trigrams required for a candidate match.

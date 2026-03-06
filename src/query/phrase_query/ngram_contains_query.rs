@@ -18,7 +18,7 @@ use std::sync::Arc;
 use regex::Regex;
 
 use super::scoring_utils::{
-    edit_distance, generate_trigrams, intersect_sorted_vecs, ngram_threshold,
+    edit_distance, fold_with_byte_map, generate_trigrams, intersect_sorted_vecs, ngram_threshold,
     token_match_distance, tokenize_raw, HighlightSink,
 };
 use crate::fieldnorm::FieldNormReader;
@@ -562,8 +562,10 @@ fn verify_regex(
     segment_id: SegmentId,
     doc_id: DocId,
 ) -> u32 {
-    // 1. Regex exact verification
-    let regex_matches: Vec<regex::Match> = params.compiled.find_iter(stored_text).collect();
+    // 1. Regex verification on ASCII-folded text (accent-insensitive).
+    //    The byte map lets us translate folded match offsets back to original text offsets.
+    let (folded_text, byte_map) = fold_with_byte_map(stored_text);
+    let regex_matches: Vec<regex::Match> = params.compiled.find_iter(&folded_text).collect();
     let tf_regex = regex_matches.len() as u32;
 
     // 2. Hybrid fuzzy verification on extracted literals (if distance > 0)
@@ -598,9 +600,10 @@ fn verify_regex(
     if tf > 0 {
         if let Some(sink) = highlight_sink {
             if tf_regex > 0 {
+                // Map folded byte offsets back to original text byte offsets.
                 let offsets: Vec<[usize; 2]> = regex_matches
                     .iter()
-                    .map(|m| [m.start(), m.end()])
+                    .map(|m| [byte_map[m.start()], byte_map[m.end()]])
                     .collect();
                 sink.insert(segment_id, doc_id, highlight_field_name, offsets);
             }
@@ -774,8 +777,11 @@ mod tests {
     }
 
     fn make_regex_params(pattern: &str, literals: Vec<&str>, fuzzy_distance: u8) -> RegexParams {
+        // Fold the pattern to ASCII (mirrors build_contains_regex in production code).
+        let mut folded = String::new();
+        crate::tokenizer::to_ascii(pattern, &mut folded);
         RegexParams {
-            compiled: Regex::new(&format!("(?i){pattern}")).unwrap(),
+            compiled: Regex::new(&format!("(?i){folded}")).unwrap(),
             literals: literals.into_iter().map(|s| s.to_string()).collect(),
             fuzzy_distance,
         }

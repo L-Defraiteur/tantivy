@@ -306,13 +306,16 @@ fn build_schema(
 }
 
 fn configure_tokenizers(index: &Index, config: &SchemaConfig) {
-    use ld_lucivy::tokenizer::{LowerCaser, SimpleTokenizer, TextAnalyzer};
+    use ld_lucivy::tokenizer::{AsciiFoldingFilter, LowerCaser, SimpleTokenizer, TextAnalyzer};
 
     use crate::tokenizer::NgramFilter;
 
     // N-gram tokenizer: always registered (used by ._ngram fields for contains queries).
+    // AsciiFoldingFilter normalizes diacritics (ç→c, é→e) so that ngram candidates
+    // are not missed when query/data differ only by accents.
     let ngram_tokenizer = TextAnalyzer::builder(SimpleTokenizer::default())
         .filter(LowerCaser)
+        .filter(AsciiFoldingFilter)
         .filter(NgramFilter)
         .build();
     index.tokenizers().register(NGRAM_TOKENIZER, ngram_tokenizer);
