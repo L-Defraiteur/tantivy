@@ -2,13 +2,104 @@
 
 BM25 search engine with cross-token fuzzy matching — it finds substrings, handles typos, and matches across word boundaries. Built for code search, technical docs, and as a BM25 complement to vector databases.
 
-## Python package
+## Install
 
-lucivy ships with Python bindings via [PyO3](https://pyo3.rs) + [maturin](https://www.maturin.rs/). Use it as a standalone BM25 index alongside vector databases like Qdrant, Milvus, etc.
+Official bindings are **MIT-licensed** — use them freely, no revenue restrictions.
+
+| Language | Install | License |
+|----------|---------|---------|
+| Python | `pip install lucivy` (or build from source) | MIT |
+| Node.js | `npm install lucivy` (or build from source) | MIT |
+| Rust | Direct dependency on `ld-lucivy` | LRSL |
+
+The core engine (`ld-lucivy`) is under LRSL v1.3 (source-available). See [License](#license) for details.
+
+## Node.js
 
 ```bash
-cd lucivy && pip install maturin && maturin develop --release
-pytest tests/  # 71 tests
+cd bindings/nodejs && npm run build
+node test.mjs
+```
+
+```javascript
+const { Index } = require('lucivy');
+
+// Create an index with text + filter fields
+const index = Index.create('./my_index', [
+    { name: 'title', type: 'text' },
+    { name: 'body', type: 'text' },
+    { name: 'year', type: 'i64', indexed: true, fast: true },
+], 'english');
+
+// Add documents
+index.add(1, { title: 'Rust programming guide', body: 'Learn systems programming with Rust', year: 2024 });
+index.add(2, { title: 'Python for data science', body: 'Data analysis with pandas and numpy', year: 2023 });
+index.add(3, { title: 'C++ template metaprogramming', body: 'Advanced C++ techniques', year: 2022 });
+index.commit();
+
+// Search — string queries use contains_split: each word is a fuzzy
+// substring match, combined with boolean OR, across all text fields
+let results = index.search('rust program');
+
+// With highlights — get byte offsets of matches per field
+results = index.search('rust', { highlights: true });
+for (const r of results) {
+    console.log(r.docId, r.score, r.highlights);
+    // highlights = { title: [[0, 4]], body: [[42, 46]] }
+}
+
+// Contains with fuzzy tolerance (catches typos)
+results = index.search({ type: 'contains', field: 'body', value: 'programing', distance: 1 });
+
+// Contains with regex (cross-token pattern matching)
+results = index.search({ type: 'contains', field: 'body', value: 'program.*language', regex: true });
+
+// Boolean: must + must_not
+results = index.search({
+    type: 'boolean',
+    must: [{ type: 'contains', field: 'body', value: 'programming' }],
+    must_not: [{ type: 'contains', field: 'body', value: 'python' }],
+});
+
+// Filters on non-text fields
+results = index.search({
+    type: 'contains',
+    field: 'body',
+    value: 'programming',
+    filters: [{ field: 'year', op: 'gte', value: 2023 }],
+});
+
+// Pre-filtered by document IDs (for hybrid search with vector DBs)
+results = index.search('programming', { allowedIds: [1, 3] });
+
+// Delete, update, persistence
+index.delete(2);
+index.update(1, { title: 'Updated title', body: 'Updated body', year: 2025 });
+index.commit();
+
+// Reopen from disk
+const index2 = Index.open('./my_index');
+```
+
+### Node.js API
+
+| Method | Description |
+|--------|-------------|
+| `Index.create(path, fields, stemmer?)` | Create a new index |
+| `Index.open(path)` | Open an existing index |
+| `index.add(docId, fields)` | Add a document |
+| `index.addMany([{docId, ...}])` | Batch add |
+| `index.delete(docId)` | Delete a document |
+| `index.update(docId, fields)` | Delete + re-add |
+| `index.commit()` / `index.rollback()` | Flush / discard |
+| `index.search(query, options?)` | Search |
+| `index.numDocs` / `index.schema` / `index.path` | Properties |
+
+## Python
+
+```bash
+cd bindings/python && pip install maturin && maturin develop --release
+pytest tests/  # 64 tests
 ```
 
 ```python
@@ -64,15 +155,13 @@ index2 = lucivy.Index.open("./my_index")
 | `index.search(query, limit, highlights?, allowed_ids?)` | Search |
 | `index.num_docs` / `index.schema` / `index.path` | Properties |
 
-### Query types
+## Query types
 
-lucivy has two categories of queries — **cross-token** (operates on stored text) and **per-token** (operates on inverted index terms). For most use cases, use `contains`.
+lucivy queries operate on **stored text** (cross-token). They handle multi-word phrases, substrings, separators, and special characters naturally.
 
-#### Cross-token queries (recommended)
+### `contains` — the workhorse query
 
-These match against the **stored text** of a field. They handle multi-word phrases, substrings, separators, and special characters naturally.
-
-**`contains`** — the workhorse query. Fuzzy substring match with separator awareness.
+Fuzzy substring match with separator awareness.
 
 ```python
 # Exact substring
@@ -88,7 +177,9 @@ index.search({"type": "contains", "field": "body", "value": "programing languag"
 index.search({"type": "contains", "field": "body", "value": "programming", "distance": 0})
 ```
 
-**`contains` + `regex: true`** — regex on stored text (cross-token).
+### `contains` + `regex`
+
+Regex on stored text (cross-token).
 
 ```python
 # Matches "programming language" — the .* spans the space between tokens
@@ -98,7 +189,9 @@ index.search({"type": "contains", "field": "body", "value": "program.*language",
 index.search({"type": "contains", "field": "body", "value": "python|rust", "regex": True})
 ```
 
-**`contains_split`** — splits query into words, each word is a `contains`, combined with OR.
+### `contains_split`
+
+Splits query into words, each word is a `contains`, combined with OR.
 
 ```python
 # String query (auto contains_split across all text fields)
@@ -106,55 +199,26 @@ index.search("rust async programming")
 
 # Explicit dict query on a specific field
 index.search({"type": "contains_split", "field": "body", "value": "memory safety"})
-
-# With fuzzy tolerance per word
-index.search({"type": "contains_split", "field": "body", "value": "memry safty", "distance": 1})
 ```
 
-**`boolean`** — combine sub-queries with must (AND), should (OR), must_not (NOT). This replaces Lucene-style `parse` queries (`"rust AND programming NOT javascript"`) with cross-token matching.
+### `boolean`
+
+Combine sub-queries with must (AND), should (OR), must_not (NOT).
 
 ```python
-# AND: docs must contain both "rust" and "programming" (as substrings, fuzzy)
 index.search({
     "type": "boolean",
     "must": [
         {"type": "contains", "field": "body", "value": "rust"},
         {"type": "contains", "field": "body", "value": "programming"},
     ],
-})
-
-# OR: docs matching either "python" or "rust"
-index.search({
-    "type": "boolean",
-    "should": [
-        {"type": "contains", "field": "body", "value": "python"},
-        {"type": "contains", "field": "body", "value": "rust"},
-    ],
-})
-
-# NOT: docs about "web" but not "javascript"
-index.search({
-    "type": "boolean",
-    "must": [{"type": "contains", "field": "body", "value": "web"}],
-    "must_not": [{"type": "contains", "field": "title", "value": "javascript"}],
+    "must_not": [{"type": "contains", "field": "body", "value": "javascript"}],
 })
 ```
 
-#### Per-token queries (legacy)
+### Filters on non-text fields
 
-These operate on **individual tokens** in the inverted index. They cannot match across token boundaries. **Prefer `contains` and `contains_split` for all new code** — they handle everything these do, plus cross-token matching, substrings, and fuzzy tolerance. Even `parse` (Lucene-style `AND`/`OR`/`NOT`) is better served by `boolean` + `contains` queries.
-
-| Type | Example |
-|------|---------|
-| `parse` | `{"type": "parse", "field": "body", "value": "rust AND programming"}` |
-| `fuzzy` | `{"type": "fuzzy", "field": "title", "value": "pythn", "distance": 1}` |
-| `regex` | `{"type": "regex", "field": "body", "pattern": "program.*"}` |
-| `term` | `{"type": "term", "field": "title", "value": "rust"}` |
-| `phrase` | `{"type": "phrase", "field": "body", "terms": ["rust", "programming"]}` |
-
-#### Filters on non-text fields
-
-Non-text fields (`i64`, `f64`, `u64`, `string`) can be filtered via the `filters` key. Fields must be created with `"indexed": True, "fast": True`.
+Non-text fields (`i64`, `f64`, `u64`, `string`) can be filtered via the `filters` key. Fields must be created with `indexed: true, fast: true`.
 
 ```python
 index.search({
@@ -168,7 +232,7 @@ index.search({
 # Supported ops: eq, ne, lt, lte, gt, gte, in, not_in, between, starts_with, contains
 ```
 
-#### Highlights
+### Highlights
 
 All query types support byte-offset highlights. Internal fields (`._raw`, `._ngram`) are automatically filtered out.
 
@@ -189,7 +253,7 @@ Every text field automatically gets 3 sub-fields:
 | Sub-field | Tokenizer | Used by |
 |-----------|-----------|---------|
 | `{name}` | stemmed or lowercase | `phrase`, `parse` queries (recall) |
-| `{name}._raw` | lowercase only | `term`, `fuzzy`, `regex`, `contains` (precision) |
+| `{name}._raw` | lowercase only | `contains` verification (precision) |
 | `{name}._ngram` | character trigrams | `contains` candidate generation |
 
 This is transparent to the user — you always reference the base field name.
@@ -204,12 +268,6 @@ The `contains` query type uses trigram-accelerated substring search on stored te
    - *Short literals*: full segment scan when literals < 3 chars
 2. **Verification** — read stored text, dispatch to fuzzy or regex verifier
 3. **BM25 scoring** — standard `idf * (1 + k1) * tf / (tf + k1 * (1 - b + b * dl / avgdl))`
-
-Three verification modes:
-
-- **Fuzzy** (default) — token-by-token Levenshtein with separator validation
-- **Regex** (`regex: true`) — compiled regex on stored text
-- **Hybrid** — regex OR fuzzy, returns `max(tf_regex, tf_fuzzy)`
 
 ### What `contains` matches
 
@@ -232,26 +290,21 @@ Three verification modes:
 | `python\|rust` | `"Python is versatile"` | yes | alternation |
 | `v[0-9]+` | `"version v2.0 released"` | yes | full-scan fallback (literal < 3 chars) |
 
-### HighlightSink
-
-Thread-safe side-channel for capturing match byte offsets during scoring. Zero extra cost — offsets are captured as a byproduct of existing verification.
-
-Supported by: `contains`, `term`, `fuzzy`, `regex`, `phrase`, and all boolean compositions.
-
-### WithFreqsAndPositionsAndOffsets
-
-New `IndexRecordOption` variant that stores `(offset_from, offset_to)` per token in the postings, like Lucene's `DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS`.
-
 ## Building
 
 ```bash
-# Rust library tests (1064 tests)
+# Rust library tests
 cargo test --lib
 
-# Python bindings + tests
-cd lucivy
+# Python bindings
+cd bindings/python
 maturin develop --release
-pytest tests/ -v  # 71 tests
+pytest tests/ -v  # 64 tests
+
+# Node.js bindings
+cargo build -p lucivy-napi --release
+cp target/release/liblucivy_napi.so bindings/nodejs/lucivy.linux-x64-gnu.node
+node bindings/nodejs/test.mjs
 ```
 
 ## Usage as a Rust dependency
@@ -270,11 +323,13 @@ Fork of [tantivy](https://github.com/quickwit-oss/tantivy) v0.26.0 (via [izihawa
 ```
 quickwit-oss/tantivy v0.22
   -> izihawa/tantivy v0.26.0 (regex phrase queries, FST improvements)
-    -> L-Defraiteur/lucivy (NgramContainsQuery, contains_split, fuzzy/regex/hybrid modes, HighlightSink, Python bindings)
+    -> L-Defraiteur/lucivy (NgramContainsQuery, contains_split, fuzzy/regex/hybrid modes, HighlightSink, Python/Node.js bindings)
 ```
 
 ## License
 
-LRSL (Luciform Research Source License) v1.2 — source-available. Free for research, personal, academic use and businesses under 100k EUR annual revenue. Commercial use above threshold requires a separate agreement. See [LICENSE](LICENSE) for details.
+The core engine (`ld-lucivy`) is licensed under **LRSL v1.3** (Luciform Research Source License) — source-available. Free for research, personal, academic use and businesses under 100k EUR annual revenue. Commercial use above threshold requires a separate agreement. See [LICENSE](LICENSE).
+
+**Official bindings (Python, Node.js) are MIT-licensed.** Per LRSL Section 4.3, you can use them freely regardless of your revenue — no commercial agreement needed. Each binding has its own MIT [LICENSE](bindings/nodejs/LICENSE) file.
 
 The original Tantivy code is MIT-licensed (see [NOTICE](NOTICE)).

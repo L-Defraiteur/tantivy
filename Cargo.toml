@@ -151,7 +151,8 @@ members = [
     "tokenizer-api",
     "columnar",
     "lucivy_fts/rust",
-    "lucivy",
+    "bindings/python",
+    "bindings/nodejs",
 ]
 
 # Following the "fail" crate best practises, we isolate

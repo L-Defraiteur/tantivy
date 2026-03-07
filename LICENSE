@@ -1,4 +1,4 @@
-Luciform Research Source License (LRSL) -- Version 1.2
+Luciform Research Source License (LRSL) -- Version 1.3
 
 Copyright (c) 2025-2026 Luciform Research
 All rights reserved except as expressly granted below.
@@ -31,6 +31,10 @@ including but not limited to:
 2.3 "Commercial Use" means any Use by an entity or for a purpose that generates revenue
 exceeding the Revenue Threshold.
 
+2.4 "Official Binding" means a language binding (e.g., Python, Node.js, WebAssembly package)
+published by Luciform Research that provides an interface to the core library without
+substantially reproducing its internal implementation.
+
 3. Permitted Use
 
 You may freely:
@@ -56,7 +60,7 @@ b) All modifications are clearly documented in a CHANGELOG file or prominent not
    at the top of modified files
 c) You do not claim endorsement by or affiliation with Luciform Research without
    written consent
-d) Redistributions must be under this same license (LRSL v1.2 or later)
+d) Redistributions must be under this same license (LRSL v1.3 or later)
 e) You clearly indicate that the redistributed version is not the official version
 
 4.2 Derivative works (modified versions) must:
@@ -66,10 +70,30 @@ b) Include a notice of modifications made
 c) Retain all copyright notices from the original software
 d) Be distributed under this same license
 
+4.3 Official Binding Exception
+
+Official Bindings (as defined in Section 2.4) may be published by Luciform Research
+under separate, more permissive licenses (such as MIT). This exception:
+
+a) Applies only to the binding code itself (the glue code, type definitions, and
+   language-specific wrappers), not to the core library source code
+b) Allows end users of Official Bindings to use them under the terms of the binding's
+   own license, without the restrictions of Sections 4.1d, 5, and 2.3 applying to
+   their use of the binding
+c) Does not grant any right to extract, copy, or redistribute the core library source
+   code under any license other than LRSL
+d) Is identified by the presence of a separate LICENSE file within the binding's
+   distribution that explicitly states the applicable license
+
+For clarity: if you install and use an Official Binding (e.g., via npm or pip),
+the binding's license governs your use. You do not need a commercial agreement
+with Luciform Research regardless of your revenue, provided you only interact with
+the software through the Official Binding's public API.
+
 5. Commercial Use Above Revenue Threshold
 
-Any Commercial Use (as defined in Section 2.3) requires a separate commercial agreement
-with Luciform Research.
+Any Commercial Use (as defined in Section 2.3) of the core library source code
+requires a separate commercial agreement with Luciform Research.
 
 5.1 To obtain a commercial license:
 - Contact: legal@luciformresearch.com
@@ -81,6 +105,9 @@ with Luciform Research.
 - You have a 60-day grace period to either:
   (a) Obtain a commercial license, or
   (b) Cease using the software
+
+5.3 Section 5 does not apply to use of Official Bindings distributed under a
+permissive license per Section 4.3.
 
 6. Patent Grant
 
@@ -164,11 +191,17 @@ IMPORTANT NOTES FOR USERS:
 1. This is a custom "source-available" license, NOT an OSI-approved open source license
 2. It is NOT compatible with GPL or other copyleft licenses
 3. Read Sections 2 and 5 carefully to understand revenue threshold requirements
-4. When in doubt about commercial use, contact legal@luciformresearch.com
+4. Official Bindings (npm, pip packages) may be used freely under their own license
+   (see Section 4.3) — no revenue threshold applies when using the software through
+   an Official Binding
+5. When in doubt about commercial use, contact legal@luciformresearch.com
 
 ---
 
 Version History:
+- v1.3 (2026): Added Official Binding Exception (Section 4.3) — bindings may be
+  distributed under permissive licenses; end users of Official Bindings are not
+  subject to revenue threshold restrictions
 - v1.2 (2026): Fixed revenue threshold from monthly to annual
 - v1.1 (2025): Added definitions, patent grant, grace period, jurisdiction, and clarifications
 - v1.0 (2025): Initial release

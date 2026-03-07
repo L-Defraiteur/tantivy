@@ -10,8 +10,8 @@ name = "lucivy"
 crate-type = ["cdylib"]
 
 [dependencies]
-lucivy-fts = { path = "../lucivy_fts/rust" }
-ld-lucivy = { path = "..", default-features = false, features = [
+lucivy-fts = { path = "../../lucivy_fts/rust" }
+ld-lucivy = { path = "../..", default-features = false, features = [
     "stopwords",
     "lz4-compression",
     "stemmer",

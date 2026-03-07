@@ -1,0 +1,25 @@
+{
+  "name": "lucivy",
+  "version": "0.1.0",
+  "description": "Fast BM25 full-text search index for Node.js, powered by Lucivy",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "license": "MIT",
+  "napi": {
+    "name": "lucivy",
+    "triples": {
+      "defaults": true
+    }
+  },
+  "files": [
+    "index.js",
+    "index.d.ts"
+  ],
+  "devDependencies": {
+    "@napi-rs/cli": "^2.18.0"
+  },
+  "scripts": {
+    "build": "napi build --release",
+    "build:debug": "napi build"
+  }
+}

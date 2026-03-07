@@ -1,24 +1,16 @@
 """Comprehensive tests for the lucivy Python bindings.
 
-Covers: CRUD, contains, contains_split, fuzzy, regex, highlights,
-composite queries, delete, update, persistence.
+Covers: CRUD, contains, contains_split, fuzzy (via distance), regex (via contains+regex),
+highlights, composite queries, filters, delete, update, persistence.
 
 Query type guide:
 ─────────────────
-- String query:       "hello world" → auto contains_split across all text fields
-- type=contains:      Substring match on stored text (cross-token, fuzzy by default d=1)
-- type=contains_split: Like contains but splits on whitespace, each word is a separate
-                       contains clause combined with boolean should
-- type=contains + regex=True: Regex on stored text (cross-token), uses ngram acceleration
-- type=fuzzy:         Levenshtein on individual tokens (per-token, NOT cross-token)
-- type=regex:         Regex on individual tokens (per-token, NOT cross-token)
-- type=phrase:        Exact phrase match (stemmed)
-- type=boolean:       Combine sub-queries with must/should/must_not
-
-Key distinction:
-  `contains` operates on STORED TEXT (cross-token, handles separators, substrings).
-  `fuzzy` and `regex` operate on INDIVIDUAL TOKENS in the inverted index.
-  For cross-token regex/fuzzy matching, always use `contains` with regex=True / distance=N.
+- String query:                  "hello world" → auto contains_split across all text fields
+- type=contains:                 Substring match on stored text (cross-token, fuzzy by default d=1)
+- type=contains + distance=N:    Fuzzy substring match (Levenshtein tolerance on each token)
+- type=contains + regex=True:    Regex on stored text (cross-token), uses ngram acceleration
+- type=contains_split:           Splits on whitespace, each word → contains, combined with boolean should
+- type=boolean:                  Combine sub-queries with must/should/must_not
 """
 
 import os
@@ -261,52 +253,12 @@ class TestContainsSplit:
 
 
 class TestFuzzy:
-    """Fuzzy matching: two approaches.
+    """Fuzzy matching via contains with distance=N (cross-token).
 
-    1. type=fuzzy (Levenshtein on individual tokens, NOT cross-token)
-       - Best for: single-word typo correction
-       - Does NOT match across token boundaries
-
-    2. type=contains with distance=N (fuzzy on stored text, cross-token)
-       - Best for: substring/phrase search tolerant to typos
-       - Default distance=1 catches common typos
-       - distance=0 for exact substring only
+    - Best for: substring/phrase search tolerant to typos
+    - Default distance=1 catches common typos
+    - distance=0 for exact substring only
     """
-
-    # ── type=fuzzy (per-token Levenshtein) ──
-
-    def test_fuzzy_single_token(self, index):
-        """type=fuzzy matches a single token with Levenshtein distance."""
-        results = index.search({
-            "type": "fuzzy",
-            "field": "title",
-            "value": "pythn",  # typo: missing 'o'
-            "distance": 1,
-        })
-        doc_ids = {r.doc_id for r in results}
-        assert 1 in doc_ids or 4 in doc_ids
-
-    def test_fuzzy_distance_2(self, index):
-        results = index.search({
-            "type": "fuzzy",
-            "field": "title",
-            "value": "pythn",
-            "distance": 2,
-        })
-        assert len(results) >= 1
-
-    def test_fuzzy_exact_also_matches(self, index):
-        """Fuzzy with distance 1 still matches exact tokens."""
-        results = index.search({
-            "type": "fuzzy",
-            "field": "title",
-            "value": "rust",
-            "distance": 1,
-        })
-        doc_ids = {r.doc_id for r in results}
-        assert 2 in doc_ids
-
-    # ── type=contains with distance (cross-token fuzzy, recommended) ──
 
     def test_contains_fuzzy_single_word(self, index):
         """Contains with distance=1 catches single-word typos (cross-token aware)."""
@@ -356,22 +308,12 @@ class TestFuzzy:
 
 
 class TestRegex:
-    """Regex matching: two approaches.
+    """Regex matching via contains with regex=True (cross-token, ngram-accelerated).
 
-    1. type=regex (Tantivy native, per-token FST walk)
-       - Pattern matches against individual tokens in the inverted index
-       - No cross-token matching: "program.*language" won't work
-       - No anchors (^/$): Tantivy doesn't support them
-       - Fast: uses FST automaton directly
-
-    2. type=contains + regex=True (cross-token, ngram-accelerated)
-       - Pattern matches against stored text (the full field value)
-       - Cross-token: "program.*language" matches "programming language"
-       - Uses ngram acceleration + regex verification
-       - THIS IS THE RECOMMENDED APPROACH for most regex use cases
+    - Pattern matches against stored text (the full field value)
+    - Cross-token: "program.*language" matches "programming language"
+    - Uses ngram acceleration + regex verification
     """
-
-    # ── type=contains + regex=True (recommended, cross-token) ──
 
     def test_contains_regex_cross_token(self, index):
         """contains+regex matches across token boundaries on stored text."""
@@ -416,44 +358,12 @@ class TestRegex:
         })
         assert len(results) == 0
 
-    # ── type=regex (per-token, for simple patterns) ──
-
-    def test_regex_per_token(self, index):
-        """type=regex matches within single tokens only."""
+    def test_contains_regex_no_match(self, index):
         results = index.search({
-            "type": "regex",
-            "field": "body",
-            "pattern": "program.*",  # matches "programming" token
-        })
-        doc_ids = {r.doc_id for r in results}
-        assert 1 in doc_ids
-
-    def test_regex_per_token_alternation(self, index):
-        """type=regex with | on individual tokens."""
-        results = index.search({
-            "type": "regex",
+            "type": "contains",
             "field": "title",
-            "pattern": "python|javascript",
-        })
-        doc_ids = {r.doc_id for r in results}
-        assert 1 in doc_ids  # Python
-        assert 3 in doc_ids  # JavaScript
-
-    def test_regex_per_token_no_cross_token(self, index):
-        """type=regex CANNOT match across tokens — this is expected to fail."""
-        results = index.search({
-            "type": "regex",
-            "field": "body",
-            "pattern": "programming language",  # space = two tokens
-        })
-        # This returns empty because regex operates per-token
-        assert len(results) == 0
-
-    def test_regex_no_match(self, index):
-        results = index.search({
-            "type": "regex",
-            "field": "title",
-            "pattern": "zzzzqqqq",
+            "value": "zzzzqqqq",
+            "regex": True,
         })
         assert len(results) == 0
 
@@ -774,12 +684,12 @@ class TestComposite:
         assert 4 not in doc_ids   # Machine Learning with Python — excluded
 
     def test_boolean_mixed_query_types(self, index):
-        """Boolean can mix different query types in sub-clauses."""
+        """Boolean can mix contains variants (regex, fuzzy) in sub-clauses."""
         results = index.search({
             "type": "boolean",
             "should": [
                 {"type": "contains", "field": "body", "value": "python|rust", "regex": True},
-                {"type": "fuzzy", "field": "title", "value": "databse", "distance": 1},
+                {"type": "contains", "field": "title", "value": "databse", "distance": 1},
             ],
         })
         doc_ids = {r.doc_id for r in results}

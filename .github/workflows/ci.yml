@@ -105,7 +105,7 @@ jobs:
       - name: Build lucivy
         run: |
           . .venv/bin/activate
-          cd lucivy && maturin develop --release
+          cd bindings/python && maturin develop --release
 
       - name: Test lucivy
         run: |
@@ -158,3 +158,30 @@ jobs:
 
           print('All lucivy Python tests passed')
           "
+
+  lucivy-nodejs:
+    runs-on: ubuntu-latest
+    name: lucivy-nodejs
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Build lucivy-napi
+        run: cargo build -p lucivy-napi --release
+
+      - name: Prepare .node binary
+        run: |
+          cp target/release/liblucivy_napi.so bindings/nodejs/lucivy.linux-x64-gnu.node
+
+      - name: Test lucivy-nodejs
+        run: node bindings/nodejs/test.mjs
