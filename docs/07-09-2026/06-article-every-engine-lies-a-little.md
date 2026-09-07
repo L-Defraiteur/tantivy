@@ -2,59 +2,97 @@
 
 # Every full-text engine lies a little
 
-*Lucie Defraiteur · 7 September 2026 · what Elasticsearch, tantivy and my own engine really return on 93 983 Linux kernel files, judged by a byte-by-byte scan of the same files*
+**93 983 Linux kernel files. Three search engines. One byte-by-byte ground truth.**
+
+*Lucie Defraiteur · 7 September 2026*
+
+| `de` — two characters | files |
+|---|---|
+| Truth, a scan of the files | **93 009 files** |
+| Elasticsearch, trigram analyzer | **0** |
+| tantivy, n-gram tokenizer | **0** |
+| lucivy | **93 009** |
 
 Here is a thing I did not expect to find: ask a search engine for the two letters `de` over the source of the Linux kernel, and two of the three engines I tested answer **0 documents**. Not an error, not a warning. Zero. The truth is 93 009 of 93 983 files.
 
-I write a search engine, so I am not neutral, and I will say where it loses. But the point of this post is not my engine. It is the method: **never trust a count you have not checked against the files.** Once you have that habit, every engine turns out to lie a little, mine included until the test caught it.
+I write a search engine, so I am not neutral, and I will say where it loses. But the point of this post is not my engine. It is a habit, and it fits in one box:
+
+> **The rule.** **The files are the ground truth.** Every engine's answer is compared against a byte-by-byte scan of the same files — document ids *and* exact byte spans. Not against another engine, not against a fixture someone wrote by hand.
+
+Once you have that habit, every engine turns out to lie a little. Mine included, until the test caught it.
 
 ## The setup
 
 One corpus: a Linux kernel tree (7.2), 93 983 text files after filtering, 857 MB of text. Three engines, each configured the way its own documentation says to do substring search, not left at defaults that would make it a straw man:
-
 - **Elasticsearch 8.19**, a trigram analyzer (min and max gram 3) on the content field, plus a `wildcard` field for regular expressions. The standard analyzer is measured too, for size.
 - **tantivy 0.25**, upstream, with its `NgramTokenizer` (3 grams); its default tokenizer measured too. Its n-gram phrase query returns 0 because all n-gram positions are 0, so I run a boolean AND of the trigrams and re-read the stored text of each candidate to verify. That is the fairest thing I could do for it.
 - **lucivy 4.0**, mine, a suffix FST over every token, defaults.
 
-And one judge: a scan of the files. For every query, a small program reads each file and finds the matches with plain string operations or a regex, then counts the documents and, when it can, the byte offsets. An engine's answer is right when its documents *and its spans* match the scan. The scan takes seconds per query; that is fine, it only has to be right.
+And one judge: a scan of the files. For every query, a small program reads each file and finds the matches with plain string operations or a regex, then counts the documents and, when it can, the byte offsets. The scan takes seconds per query; that is fine, it only has to be right. Everything here is reproducible with one script, `benches/compare_engines.sh`, which writes [this report](https://github.com/L-Defraiteur/lucivy/blob/main/docs/compare-engines-2026-09-05.md) with the exact mappings and tokenizer settings.
 
-> Everything below is reproducible with one script in the repository, `benches/compare_engines.sh`, which writes [this report](https://github.com/L-Defraiteur/lucivy/blob/main/docs/compare-engines-2026-09-05.md). The exact index mappings and tokenizer settings are in it.
-
-## Where everyone agrees
-
-On a plain substring, all three agree with the scan to the document: `mutex_lock` is in 5 145 files, `spin_lock` in 6 569, `sched` in 9 289 (5 284 as a whole word: the difference is `sched_clock`, `schedule`, `sched_domain`). Good. That is the case everyone tests, and everyone passes it.
+First, the boring sanity check: ordinary substrings work everywhere. `mutex_lock` (5 145 files), `spin_lock` (6 569) and `sched` (9 289) match the scan exactly on all three engines. That is the case everyone tests, and everyone passes it.
 
 ## Where they part
 
-| asked | truth (the scan) | lucivy | Elasticsearch | tantivy |
+**93 009 → 0** — A two-character substring. Both trigram indexes return nothing, and say nothing.
+
+**10 034 → 3 549** — A typo sitting across an underscore. Term-level fuzziness misses two thirds of the files.
+
+**20 797 / 20 797** — Every byte position of `mutex_lock` in 5 145 files, delivered with the answer, in 15 ms.
+
+| asked | truth | lucivy | Elasticsearch | tantivy |
 |---|---|---|---|---|
-| `spin_lock` with separators relaxed: also `spin lock`, `spin-lock`, `spinlock` | 9 552 | **9 552**, 23 ms | 6 577 — its trigrams carry the underscore, so `spin lock` and `spinlock` are other strings | 6 601 — relaxed is the only mode it has: the separator never enters its index, so `spin_lock` and `spinlock` are the same thing to it |
-| `spinlokc`, two edits, the typo sitting across the token boundary | 10 034 | **10 034**, 148 ms | 3 549 — fuzziness compares whole terms | 6 557 — same |
-| `spin_lock_[a-z]+`, a regular expression | 5 510 | **5 510**, 219 ms | 5 440 on the wildcard field, 480 ms — 70 short | 0 — the terms are already cut into grams |
-| `de`, two characters | 93 009 | **93 009**, 7.7 million positions, 561 ms | 0, silently | 0, silently |
-| `retur -ENOMEM`, a fuzzy phrase | 14 449 | **14 449**, 30 ms | 14 446 with `span_near`, 24 ms — it does this well | — |
-| **where it matched**: every position of `mutex_lock` in its 5 145 files | 20 797 spans | **all 20 797**, 15 ms | `highlight` on the top 200 documents only: 179 ms | re-reading 5 145 stored texts: 96 ms |
+| `spin_lock`, separators relaxed | 9 552 | ✔ 9 552  (23 ms) | ▲ 6 577 | ▲ 6 601 |
+| `spinlokc`, two edits, across the boundary | 10 034 | ✔ 10 034  (148 ms) | ▲ 3 549 | ▲ 6 557 |
+| `spin_lock_[a-z]+`, a regex | 5 510 | ✔ 5 510  (219 ms) | ▲ 5 440  (480 ms) | ✘ 0 |
+| `de`, two characters | 93 009 | ✔ 93 009  (561 ms, 7.7 M spans) | ✘ 0 | ✘ 0 |
+| `retur -ENOMEM`, a fuzzy phrase | 14 449 | ✔ 14 449  (30 ms) | ✔ 14 446  (24 ms) | — |
+| positions of `mutex_lock`, 5 145 files | 20 797 | ✔ all  (15 ms) | ▲ top 200  (179 ms) | ▲ re-read  (96 ms) |
+
+*✔ matches the scan · ▲ incomplete · ✘ nothing, silently. Timings are the engine's own, idle machine.*
+
+What is going on in each column:
+- **Relaxed separators.** Elasticsearch's trigrams carry the underscore, so `spin lock` and `spinlock` are other strings to it. tantivy's n-gram tokenizer is the opposite: the separator never enters the index, so "relaxed" is the only mode it has — and it cannot do strict at all.
+- **The typo.** `spinlokc` is one transposition away from `spin_lock`, but the transposition straddles the underscore. Term-level fuzziness compares the query to whole terms, and no single term is within two edits of it. The count is not zero, so it looks fine.
+- **The regex.** tantivy's terms are already cut into grams; there is nothing left for a regex to run on. Elasticsearch's `wildcard` field gets close and misses 70.
+- **Two characters.** Shorter than a trigram: unrepresentable in both indexes. Zero, and nothing tells you.
+- **Positions.** Elasticsearch recomputes highlights on the top 200 documents you ask for; tantivy re-reads the stored text of every candidate. lucivy stores positions in the index and returns all of them with the answer.
 
 Read the zeros again. They are the interesting part. An engine that returns 6 577 where the truth is 9 552 is wrong in a way you might notice. An engine that returns **0** for two characters looks like it worked and found nothing, and nobody notices, because who checks a zero?
 
-The typo row is the same story. `spinlokc` is one transposition away from `spin_lock`, but the transposition straddles the underscore. Term-level fuzziness compares `spinlokc` to whole terms, and no single term is within two edits of it, so a third to two thirds of the documents are missing. The count is not zero, so it looks fine.
+To be precise about the word in the title: some of these are bugs; others are consequences of the index configuration, and an Elasticsearch expert will rightly say that with `min_gram = 3` the query `de` is unrepresentable by design. True. From the caller's point of view the dangerous part is the same: a plausible-looking answer can still be incomplete, and the API does not distinguish "none" from "I cannot ask that".
 
 ## Where they win, because they do
 
 This is not a hit piece. Same corpus, same machine, idle:
 
-| engine | index | × the text | indexing |
-|---|---|---|---|
-| Elasticsearch, standard analyzer | 781 MB | ×0.9 | 28 s |
-| Elasticsearch, trigrams + `wildcard` | 3 082 MB | ×3.6 | 123 s |
-| tantivy, default tokenizer | 612 MB | ×0.7 | **1 s** |
-| tantivy, `NgramTokenizer` | 680 MB | ×0.8 | **5 s** |
-| lucivy 4.0 | 4 926 MB | ×5.8 | 107 s |
-| lucivy 4.0 with `derived_in_ram` | 3 335 MB | ×3.9 | 111 s |
+*Index size, and the ratio to the 857 MB of text.*
 
-tantivy indexes this corpus in one to five seconds. Mine takes a hundred. Its index is seven times smaller. On a whole-word query it answers in 0 ms where mine takes 27. Elasticsearch does the fuzzy phrase as well as I do. If your queries are whole words, use them and be happy. And note the difference of kind: Elasticsearch is a service you run next to your application; mine is a library that goes inside it. The index lives in your process, in your transaction if you plug your own storage, on your machine — nothing to deploy beside your service, nothing that leaves it, and the same engine runs in the browser with the data staying in the tab.
+| | |
+|---|---|
+| tantivy, default tokenizer | 612 MB · ×0.7 |
+| tantivy, n-grams | 680 MB · ×0.8 |
+| Elasticsearch, standard | 781 MB · ×0.9 |
+| Elasticsearch, trigrams + wildcard | 3 082 MB · ×3.6 |
+| lucivy, derived_in_ram | 3 335 MB · ×3.9 |
+| lucivy, default | 4 926 MB · ×5.8 |
 
-What my index buys with its size is the other half of the first table: the questions a trigram index cannot ask, and the exact position of every match delivered with the answer instead of recomputed for the top 200.
+*Time to index the corpus.*
+
+| | |
+|---|---|
+| tantivy, default tokenizer | 1 s |
+| tantivy, n-grams | 5 s |
+| Elasticsearch, standard | 28 s |
+| lucivy, default | 107 s |
+| lucivy, derived_in_ram | 111 s |
+| Elasticsearch, trigrams + wildcard | 123 s |
+
+tantivy indexes this corpus in one to five seconds. Mine takes a hundred. Its index is seven times smaller. On a whole-word query it answers in 0 ms where mine takes 27. Elasticsearch does the fuzzy phrase as well as I do. If your queries are whole words, use them and be happy.
+
+And note the difference of kind: Elasticsearch is a service you run next to your application; mine is a library that goes inside it. The index lives in your process, in your transaction if you plug your own storage, on your machine — nothing to deploy beside your service, nothing that leaves it, and the same engine runs in the browser with the data staying in the tab.
+
+What my index buys with its size is the first table: the questions a trigram index cannot ask, and the exact position of every match delivered with the answer instead of recomputed for the top 200.
 
 ## The method is the point
 
@@ -62,11 +100,17 @@ I did not start with the comparison. I started with a test that indexes the kern
 
 If you take one thing from this post: put a scan of the files next to your engine, on a real corpus, and diff. It is a slow, dumb program. It is also the only one in the room that cannot be wrong about what is in the files.
 
+## Reproduce it
+
 ```bash
 git clone --depth=1 --branch v7.2 https://github.com/torvalds/linux /tmp/linux-bench
 V3_CORPUS=/tmp/linux-bench V3_SFX_VERSION=4 cargo test --release -p lucivy-core \
     --test test_sfx_v3_ground_truth v3_ground_truth_demo -- --ignored --nocapture
+# the three-engine comparison, Elasticsearch optional (a container):
+benches/compare_engines.sh /tmp/linux-bench
 ```
+
+Another kernel tree gives other counts; what does not move is the claim: the harness fails on any disagreement between the engine and the scan of *your* files.
 
 ## If you want to try the engine
 
