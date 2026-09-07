@@ -47,7 +47,7 @@ Read across a row: the same question, what each engine can make of it (an Elasti
 
 ## 3 bis. Probed on 7 September 2026 — separators, symbols, mid-token starts
 
-Twelve more substrings, asked strictly, on the same indexes (Elasticsearch `cmp_ngram`, a `match_phrase` on the trigram field; tantivy's trigram index through the verified path of §3; lucivy's dictionary index rebuilt in 107.9 s). The truth is the same scan. Bold = matches the scan.
+Twelve more substrings, asked strictly, on the same indexes (Elasticsearch `cmp_ngram`, a `match_phrase` on the trigram field; tantivy's trigram index through the verified path of §3; lucivy's dictionary index rebuilt in 107.9 s). The truth is the same scan. Bold = matches the scan. **lucivy's time includes every byte position of every match** (the span counts are in its column); the other two times are the document count alone — their positions are a second step, priced in §4 (Elasticsearch: `highlight` on the top 200; tantivy: re-reading each stored text).
 
 | asked (strict) | truth | lucivy | Elasticsearch, trigrams | tantivy, trigrams verified |
 |---|---|---|---|---|
