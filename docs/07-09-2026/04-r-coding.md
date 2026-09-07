@@ -8,7 +8,7 @@ Search code the way you grep it: a full-text engine with exact byte spans, verif
 
 **Where it runs.** A Rust library with Python, Node.js, C++ and browser bindings, MIT. In your process, in your transaction if you plug your own storage, and in the browser: the demo below clones its own source from GitHub and indexes it in your tab in 3 s, then PostgreSQL's 5 199 files in 14 s, every search timed live.
 
-- Playground, runs in your browser: https://l-defraiteur.github.io/lucivy/
-- Repo (MIT): https://github.com/L-Defraiteur/lucivy
-- The comparison, reproducible with one script: https://github.com/L-Defraiteur/lucivy/blob/main/docs/compare-engines-2026-09-05.md
-- `pip install lucivy` · `npm install lucivy` · `cargo add lucivy-core` — 4.0.2
+- [**Try it in your browser**](https://l-defraiteur.github.io/lucivy/) — the playground
+- [Source on GitHub](https://github.com/L-Defraiteur/lucivy) (MIT)
+- [The comparison with Elasticsearch and tantivy](https://github.com/L-Defraiteur/lucivy/blob/main/docs/compare-engines-2026-09-05.md), reproducible with one script
+- [PyPI](https://pypi.org/project/lucivy/) · [npm](https://www.npmjs.com/package/lucivy) · [crates.io](https://crates.io/crates/lucivy-core) — 4.0.2

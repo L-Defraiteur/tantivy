@@ -23,9 +23,9 @@ Where they win, because they do: tantivy indexes the corpus in 1-5 s against 107
 
 **Where it runs.** It is a library, not a server: Rust, with Python, Node.js and C++ bindings, MIT. It runs in your process, inside your database transaction if you plug your own storage, and the same engine runs in the browser — the demo below clones its own source from GitHub and indexes it in your tab in 3 s, then PostgreSQL's 5 199 files in 14 s, every search timed live. You can type your own.
 
-- Playground, runs in your browser: https://l-defraiteur.github.io/lucivy/
-- Repo (MIT): https://github.com/L-Defraiteur/lucivy
-- The comparison, reproducible with one script: https://github.com/L-Defraiteur/lucivy/blob/main/docs/compare-engines-2026-09-05.md
-- `pip install lucivy` · `npm install lucivy` · `cargo add lucivy-core` — 4.0.2
+- [**Try it in your browser**](https://l-defraiteur.github.io/lucivy/) — the playground
+- [Source on GitHub](https://github.com/L-Defraiteur/lucivy) (MIT)
+- [The comparison with Elasticsearch and tantivy](https://github.com/L-Defraiteur/lucivy/blob/main/docs/compare-engines-2026-09-05.md), reproducible with one script
+- [PyPI](https://pypi.org/project/lucivy/) · [npm](https://www.npmjs.com/package/lucivy) · [crates.io](https://crates.io/crates/lucivy-core) — 4.0.2
 
 Criticism of the comparison is what I am after: if you know a configuration of either engine that gets closer on a row, I'll add it to the report.
