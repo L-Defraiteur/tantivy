@@ -153,6 +153,7 @@
 <div class="scroll">
 <table>
 <tr><th>asked</th><th>truth</th><th>lucivy</th><th>Elasticsearch</th><th>tantivy</th></tr>
+<tr><td><code>spin_lock</code>, separators strict</td><td class="n">6 569</td><td class="n ok">✔ 6 569 <small>12 ms</small></td><td class="n ok">✔ 6 569 <small>10 ms</small></td><td class="n ok">✔ 6 569 <small>116 ms</small></td></tr>
 <tr><td><code>spin_lock</code>, separators relaxed</td><td class="n">9 552</td><td class="n ok">✔ 9 552 <small>23 ms</small></td><td class="n part">▲ 6 577</td><td class="n part">▲ 6 601</td></tr>
 <tr><td><code>spinlokc</code>, two edits, across the boundary</td><td class="n">10 034</td><td class="n ok">✔ 10 034 <small>148 ms</small></td><td class="n part">▲ 3 549</td><td class="n part">▲ 6 557</td></tr>
 <tr><td><code>spin_lock_[a-z]+</code>, a regex</td><td class="n">5 510</td><td class="n ok">✔ 5 510 <small>219 ms</small></td><td class="n part">▲ 5 440 <small>480 ms</small></td><td class="n zero">✘ 0</td></tr>
@@ -166,10 +167,12 @@
 <p>What is going on in each column:</p>
 
 <ul>
+  <li><b>Strict separators.</b> Everyone gets this one — but look at how. Elasticsearch's trigram analyzer keeps the underscore, so it can only be strict (its relaxed answer is the 6 577 below); tantivy's n-gram tokenizer keeps it too, and its default tokenizer drops it, so it is strict <i>or</i> relaxed depending on which index you built. With lucivy, strict and relaxed are two flags on the same query over the same index: <code>--strict "spin_lock"</code> is 6 569, without it 9 552.</li>
   <li><b>Relaxed separators.</b> Elasticsearch's trigrams carry the underscore, so <code>spin lock</code> and <code>spinlock</code> are other strings to it. tantivy's n-gram tokenizer is the opposite: the separator never enters the index, so "relaxed" is the only mode it has — and it cannot do strict at all.</li>
   <li><b>The typo.</b> <code>spinlokc</code> is one transposition away from <code>spin_lock</code>, but the transposition straddles the underscore. Term-level fuzziness compares the query to whole terms, and no single term is within two edits of it. The count is not zero, so it looks fine.</li>
   <li><b>The regex.</b> tantivy's terms are already cut into grams; there is nothing left for a regex to run on. Elasticsearch's <code>wildcard</code> field gets close and misses 70.</li>
   <li><b>Two characters.</b> Shorter than a trigram: unrepresentable in both indexes. Zero, and nothing tells you.</li>
+  <li><b>Any byte.</b> A suffix index over bytes has no notion of "symbol": <code>rust🦀lang</code>, <code>brûlée</code>, <code>-ENOMEM;</code> are substrings like any other. On lucivy's own source, <code>"rust🦀lang"</code> is 5 files in 8.9 ms in the browser demo. I did not measure emoji on the other two engines, so no row: the standard analyzer of Elasticsearch drops symbols by design, its trigram analyzer keeps them, and I would rather not guess the rest.</li>
   <li><b>Positions.</b> Elasticsearch recomputes highlights on the top 200 documents you ask for; tantivy re-reads the stored text of every candidate. lucivy stores positions in the index and returns all of them with the answer.</li>
 </ul>
 

@@ -42,6 +42,7 @@ First, the boring sanity check: ordinary substrings work everywhere. `mutex_lock
 
 | asked | truth | lucivy | Elasticsearch | tantivy |
 |---|---|---|---|---|
+| `spin_lock`, separators strict | 6 569 | ✔ 6 569 (12 ms) | ✔ 6 569 (10 ms) | ✔ 6 569 (116 ms) |
 | `spin_lock`, separators relaxed | 9 552 | ✔ 9 552  (23 ms) | ▲ 6 577 | ▲ 6 601 |
 | `spinlokc`, two edits, across the boundary | 10 034 | ✔ 10 034  (148 ms) | ▲ 3 549 | ▲ 6 557 |
 | `spin_lock_[a-z]+`, a regex | 5 510 | ✔ 5 510  (219 ms) | ▲ 5 440  (480 ms) | ✘ 0 |
@@ -52,10 +53,12 @@ First, the boring sanity check: ordinary substrings work everywhere. `mutex_lock
 *✔ matches the scan · ▲ incomplete · ✘ nothing, silently. Timings are the engine's own, idle machine.*
 
 What is going on in each column:
+- **Strict separators.** Everyone gets this one — but look at how. Elasticsearch's trigram analyzer keeps the underscore, so it can only be strict (its relaxed answer is the 6 577 below); tantivy's n-gram tokenizer keeps it too, and its default tokenizer drops it, so it is strict *or* relaxed depending on which index you built. With lucivy, strict and relaxed are two flags on the same query over the same index: `--strict "spin_lock"` is 6 569, without it 9 552.
 - **Relaxed separators.** Elasticsearch's trigrams carry the underscore, so `spin lock` and `spinlock` are other strings to it. tantivy's n-gram tokenizer is the opposite: the separator never enters the index, so "relaxed" is the only mode it has — and it cannot do strict at all.
 - **The typo.** `spinlokc` is one transposition away from `spin_lock`, but the transposition straddles the underscore. Term-level fuzziness compares the query to whole terms, and no single term is within two edits of it. The count is not zero, so it looks fine.
 - **The regex.** tantivy's terms are already cut into grams; there is nothing left for a regex to run on. Elasticsearch's `wildcard` field gets close and misses 70.
 - **Two characters.** Shorter than a trigram: unrepresentable in both indexes. Zero, and nothing tells you.
+- **Any byte.** A suffix index over bytes has no notion of "symbol": `rust🦀lang`, `brûlée`, `-ENOMEM;` are substrings like any other. On lucivy's own source, `"rust🦀lang"` is 5 files in 8.9 ms in the browser demo. I did not measure emoji on the other two engines, so no row: the standard analyzer of Elasticsearch drops symbols by design, its trigram analyzer keeps them, and I would rather not guess the rest.
 - **Positions.** Elasticsearch recomputes highlights on the top 200 documents you ask for; tantivy re-reads the stored text of every candidate. lucivy stores positions in the index and returns all of them with the answer.
 
 Read the zeros again. They are the interesting part. An engine that returns 6 577 where the truth is 9 552 is wrong in a way you might notice. An engine that returns **0** for two characters looks like it worked and found nothing, and nobody notices, because who checks a zero?
