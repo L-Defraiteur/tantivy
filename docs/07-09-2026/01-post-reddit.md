@@ -1,5 +1,10 @@
 # Post Reddit — 7 septembre 2026 (4.0.2)
 
+**Les posts prêts à coller, un fichier par subreddit** (première ligne = le
+titre, le reste = le corps, markdown Reddit) : `02-r-rust.md`,
+`03-r-programming.md`, `04-r-coding.md`. Ce fichier garde le cadrage, les
+variantes de titre et la recette du GIF.
+
 Cible : r/rust d'abord (le plus lu pour une bibliothèque Rust, ton technique,
 les chiffres passent), puis r/programming et r/coding avec le même corps et
 un titre moins Rust. Format : **post vidéo** avec `images/demo.mp4` (3 Mo,
