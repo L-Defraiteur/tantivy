@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Every full-text engine lies a little — measured on the Linux kernel</title>
+<meta name="description" content="What Elasticsearch, tantivy and lucivy really return on substring, fuzzy, regex and two-character queries over 93 983 Linux kernel files, judged by a byte-by-byte scan of the same files.">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="lucivy">
+<meta property="og:url" content="https://l-defraiteur.github.io/lucivy/blog/every-engine-lies-a-little.html">
+<meta property="og:title" content="Every full-text engine lies a little — measured on the Linux kernel">
+<meta property="og:description" content="What Elasticsearch, tantivy and lucivy really return on substring, fuzzy, regex and two-character queries over 93 983 kernel files, judged by a byte-by-byte scan of the same files.">
+<meta property="og:image" content="https://l-defraiteur.github.io/lucivy/og-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="https://l-defraiteur.github.io/lucivy/blog/every-engine-lies-a-little.html">
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b22; --border: #30363d; --text: #e6edf3;
+    --text-dim: #8b949e; --accent: #58a6ff; --highlight: #ffa657; --green: #3fb950; --red: #f85149;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    line-height: 1.6; font-size: 17px; }
+  nav { max-width: 760px; margin: 0 auto; padding: 18px 20px; display: flex; justify-content: space-between; align-items: baseline; }
+  nav a { color: var(--accent); text-decoration: none; font-weight: 600; }
+  nav .links a { color: var(--text-dim); font-weight: 400; margin-left: 16px; font-size: 14px; }
+  article { max-width: 760px; margin: 0 auto; padding: 8px 20px 80px; }
+  h1 { font-size: 34px; line-height: 1.2; margin: 24px 0 8px; }
+  .meta { color: var(--text-dim); font-size: 14px; margin-bottom: 32px; }
+  h2 { font-size: 22px; margin: 40px 0 12px; }
+  p { margin: 0 0 16px; }
+  code { font-family: "SF Mono", "Fira Code", monospace; font-size: 0.88em; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; }
+  pre { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px;
+    overflow-x: auto; font-size: 14px; line-height: 1.5; }
+  pre code { border: 0; padding: 0; background: none; font-size: inherit; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; margin: 8px 0 20px; display: block; overflow-x: auto; }
+  th, td { border: 1px solid var(--border); padding: 8px 10px; text-align: left; vertical-align: top; }
+  th { background: var(--surface); }
+  td b { color: var(--text); }
+  .truth { color: var(--green); }
+  .zero { color: var(--red); }
+  a { color: var(--accent); }
+  .note { color: var(--text-dim); font-size: 15px; border-left: 3px solid var(--border); padding-left: 14px; margin: 20px 0; }
+  img { max-width: 100%; border-radius: 6px; border: 1px solid var(--border); }
+</style>
+</head>
+<body>
+<nav>
+  <a href="../">lucivy</a>
+  <span class="links">
+    <a href="https://github.com/L-Defraiteur/lucivy">GitHub</a>
+    <a href="https://github.com/L-Defraiteur/lucivy/blob/main/docs/compare-engines-2026-09-05.md">the report</a>
+    <a href="../#playground">playground</a>
+  </span>
+</nav>
+<article>
+<h1>Every full-text engine lies a little</h1>
+<p class="meta">Lucie Defraiteur · 7 September 2026 · what Elasticsearch, tantivy and my own engine really return on 93 983 Linux kernel files, judged by a byte-by-byte scan of the same files</p>
+
+<p>Here is a thing I did not expect to find: ask a search engine for the two letters <code>de</code> over the source of the Linux kernel, and two of the three engines I tested answer <b>0 documents</b>. Not an error, not a warning. Zero. The truth is 93 009 of 93 983 files.</p>
+
+<p>I write a search engine, so I am not neutral, and I will say where it loses. But the point of this post is not my engine. It is the method: <b>never trust a count you have not checked against the files.</b> Once you have that habit, every engine turns out to lie a little, mine included until the test caught it.</p>
+
+<h2>The setup</h2>
+
+<p>One corpus: a Linux kernel tree (7.2), 93 983 text files after filtering, 857 MB of text. Three engines, each configured the way its own documentation says to do substring search, not left at defaults that would make it a straw man:</p>
+
+<ul>
+  <li><b>Elasticsearch 8.19</b>, a trigram analyzer (min and max gram 3) on the content field, plus a <code>wildcard</code> field for regular expressions. The standard analyzer is measured too, for size.</li>
+  <li><b>tantivy 0.25</b>, upstream, with its <code>NgramTokenizer</code> (3 grams); its default tokenizer measured too. Its n-gram phrase query returns 0 because all n-gram positions are 0, so I run a boolean AND of the trigrams and re-read the stored text of each candidate to verify. That is the fairest thing I could do for it.</li>
+  <li><b>lucivy 4.0</b>, mine, a suffix FST over every token, defaults.</li>
+</ul>
+
+<p>And one judge: a scan of the files. For every query, a small program reads each file and finds the matches with plain string operations or a regex, then counts the documents and, when it can, the byte offsets. An engine's answer is right when its documents <i>and its spans</i> match the scan. The scan takes seconds per query; that is fine, it only has to be right.</p>
+
+<div class="note">Everything below is reproducible with one script in the repository, <code>benches/compare_engines.sh</code>, which writes <a href="https://github.com/L-Defraiteur/lucivy/blob/main/docs/compare-engines-2026-09-05.md">this report</a>. The exact index mappings and tokenizer settings are in it.</div>
+
+<h2>Where everyone agrees</h2>
+
+<p>On a plain substring, all three agree with the scan to the document: <code>mutex_lock</code> is in 5 145 files, <code>spin_lock</code> in 6 569, <code>sched</code> in 9 289 (5 284 as a whole word: the difference is <code>sched_clock</code>, <code>schedule</code>, <code>sched_domain</code>). Good. That is the case everyone tests, and everyone passes it.</p>
+
+<h2>Where they part</h2>
+
+<table>
+<tr><th>asked</th><th>truth (the scan)</th><th>lucivy</th><th>Elasticsearch</th><th>tantivy</th></tr>
+<tr><td><code>spin_lock</code> with separators relaxed: also <code>spin lock</code>, <code>spin-lock</code>, <code>spinlock</code></td><td class="truth">9 552</td><td><b>9 552</b>, 23 ms</td><td>6 577 — its trigrams carry the underscore, so <code>spin lock</code> and <code>spinlock</code> are other strings</td><td>6 601 — relaxed is the only mode it has: the separator never enters its index, so <code>spin_lock</code> and <code>spinlock</code> are the same thing to it</td></tr>
+<tr><td><code>spinlokc</code>, two edits, the typo sitting across the token boundary</td><td class="truth">10 034</td><td><b>10 034</b>, 148 ms</td><td>3 549 — fuzziness compares whole terms</td><td>6 557 — same</td></tr>
+<tr><td><code>spin_lock_[a-z]+</code>, a regular expression</td><td class="truth">5 510</td><td><b>5 510</b>, 219 ms</td><td>5 440 on the wildcard field, 480 ms — 70 short</td><td class="zero">0 — the terms are already cut into grams</td></tr>
+<tr><td><code>de</code>, two characters</td><td class="truth">93 009</td><td><b>93 009</b>, 7.7 million positions, 561 ms</td><td class="zero">0, silently</td><td class="zero">0, silently</td></tr>
+<tr><td><code>retur -ENOMEM</code>, a fuzzy phrase</td><td class="truth">14 449</td><td><b>14 449</b>, 30 ms</td><td>14 446 with <code>span_near</code>, 24 ms — it does this well</td><td>—</td></tr>
+<tr><td><b>where it matched</b>: every position of <code>mutex_lock</code> in its 5 145 files</td><td class="truth">20 797 spans</td><td><b>all 20 797</b>, 15 ms</td><td><code>highlight</code> on the top 200 documents only: 179 ms</td><td>re-reading 5 145 stored texts: 96 ms</td></tr>
+</table>
+
+<p>Read the zeros again. They are the interesting part. An engine that returns 6 577 where the truth is 9 552 is wrong in a way you might notice. An engine that returns <b>0</b> for two characters looks like it worked and found nothing, and nobody notices, because who checks a zero?</p>
+
+<p>The typo row is the same story. <code>spinlokc</code> is one transposition away from <code>spin_lock</code>, but the transposition straddles the underscore. Term-level fuzziness compares <code>spinlokc</code> to whole terms, and no single term is within two edits of it, so a third to two thirds of the documents are missing. The count is not zero, so it looks fine.</p>
+
+<h2>Where they win, because they do</h2>
+
+<p>This is not a hit piece. Same corpus, same machine, idle:</p>
+
+<table>
+<tr><th>engine</th><th>index</th><th>× the text</th><th>indexing</th></tr>
+<tr><td>Elasticsearch, standard analyzer</td><td>781 MB</td><td>×0.9</td><td>28 s</td></tr>
+<tr><td>Elasticsearch, trigrams + <code>wildcard</code></td><td>3 082 MB</td><td>×3.6</td><td>123 s</td></tr>
+<tr><td>tantivy, default tokenizer</td><td>612 MB</td><td>×0.7</td><td><b>1 s</b></td></tr>
+<tr><td>tantivy, <code>NgramTokenizer</code></td><td>680 MB</td><td>×0.8</td><td><b>5 s</b></td></tr>
+<tr><td>lucivy 4.0</td><td>4 926 MB</td><td>×5.8</td><td>107 s</td></tr>
+<tr><td>lucivy 4.0 with <code>derived_in_ram</code></td><td>3 335 MB</td><td>×3.9</td><td>111 s</td></tr>
+</table>
+
+<p>tantivy indexes this corpus in one to five seconds. Mine takes a hundred. Its index is seven times smaller. On a whole-word query it answers in 0 ms where mine takes 27. Elasticsearch does the fuzzy phrase as well as I do, and its cluster does things my library will never do. If your queries are whole words, use them and be happy.</p>
+
+<p>What my index buys with its size is the other half of the first table: the questions a trigram index cannot ask, and the exact position of every match delivered with the answer instead of recomputed for the top 200.</p>
+
+<h2>The method is the point</h2>
+
+<p>I did not start with the comparison. I started with a test that indexes the kernel, runs a panel of queries, and fails if any count or any span disagrees with the scan. It runs on every release. It caught my own engine lying twice this summer: once dropping documents whose fuzzy match crossed a separator (3.0.2 to 3.0.6, a whole month), once returning a stale dictionary one run in three under a race. Both were invisible in the ordinary tests, which showed "20 hits" because 20 was the result limit.</p>
+
+<p>If you take one thing from this post: put a scan of the files next to your engine, on a real corpus, and diff. It is a slow, dumb program. It is also the only one in the room that cannot be wrong about what is in the files.</p>
+
+<pre><code>git clone --depth=1 --branch v7.2 https://github.com/torvalds/linux /tmp/linux-bench
+V3_CORPUS=/tmp/linux-bench V3_SFX_VERSION=4 cargo test --release -p lucivy-core \
+    --test test_sfx_v3_ground_truth v3_ground_truth_demo -- --ignored --nocapture</code></pre>
+
+<h2>If you want to try the engine</h2>
+
+<p>lucivy is a Rust library, MIT, with Python, Node.js and C++ bindings, and it runs in the browser: <a href="../">the playground</a> clones its own source from GitHub and indexes it in your tab in about three seconds, then you can type <code>index postgres</code> or <code>index linux</code> and search a whole tree with <code>--fuzzy</code>, <code>--regex</code>, <code>--strict</code>. The repository is <a href="https://github.com/L-Defraiteur/lucivy">here</a>. And if you know a configuration of Elasticsearch or tantivy that gets closer on any row above, tell me: it goes into the report with your name on the line.</p>
+</article>
+</body>
+</html>
