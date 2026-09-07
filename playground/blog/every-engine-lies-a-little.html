@@ -42,14 +42,14 @@
   small { color: var(--text-dim); }
 
   /* cover callout */
-  .cover { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 22px 24px; margin: 8px 0 28px;
-    display: grid; grid-template-columns: auto 1fr; gap: 6px 28px; align-items: center; }
-  .cover .q { font-family: "SF Mono", "Fira Code", monospace; font-size: 52px; font-weight: 700; color: var(--highlight); grid-row: span 4; line-height: 1; }
-  .cover .row { display: flex; justify-content: space-between; gap: 16px; font-size: 16px; border-bottom: 1px solid var(--border); padding: 4px 0; }
+  .cover { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px 22px 10px; margin: 8px 0 28px; }
+  .cover .q { font-family: "SF Mono", "Fira Code", monospace; font-size: 15px; color: var(--text-dim); padding-bottom: 10px; margin-bottom: 4px; border-bottom: 1px solid var(--border); }
+  .cover .q b { color: var(--highlight); font-weight: 600; }
+  .cover .q .p { color: var(--green); }
+  .cover .row { display: flex; justify-content: space-between; gap: 16px; font-size: 16px; border-bottom: 1px solid var(--border); padding: 7px 0; }
   .cover .row:last-child { border-bottom: 0; }
-  .cover .row b { font-family: "SF Mono", "Fira Code", monospace; font-size: 18px; }
+  .cover .row b { font-family: "SF Mono", "Fira Code", monospace; font-size: 17px; }
   .cover .t b { color: var(--green); } .cover .z b { color: var(--red); } .cover .l b { color: var(--text); }
-  @media (max-width: 520px) { .cover { grid-template-columns: 1fr; } .cover .q { grid-row: auto; font-size: 40px; } }
 
   /* the rule */
   .rule { border: 1px solid var(--accent); border-left: 4px solid var(--accent); border-radius: 8px; padding: 14px 18px; margin: 24px 0; background: rgba(88,166,255,0.06); }
@@ -106,14 +106,14 @@
 <p class="meta">Lucie Defraiteur · 7 September 2026</p>
 
 <div class="cover">
-  <div class="q">de</div>
+  <div class="q"><span class="p">$</span> search <b>"de"</b> <span>— two letters, over 93 983 files</span></div>
   <div class="row t"><span>Truth, a scan of the files</span><b>93 009 files</b></div>
   <div class="row z"><span>Elasticsearch, trigram analyzer</span><b>0</b></div>
   <div class="row z"><span>tantivy, n-gram tokenizer</span><b>0</b></div>
   <div class="row l"><span>lucivy</span><b>93 009</b></div>
 </div>
 
-<p>Here is a thing I did not expect to find: ask a search engine for the two letters <code>de</code> over the source of the Linux kernel, and two of the three engines I tested answer <b>0 documents</b>. Not an error, not a warning. Zero. The truth is 93 009 of 93 983 files.</p>
+<p>Here is a thing I did not expect to find: ask a search engine for the two letters <code>"de"</code> over the source of the Linux kernel, and two of the three engines I tested answer <b>0 documents</b>. Not an error, not a warning. Zero. The truth is 93 009 of 93 983 files.</p>
 
 <p>I write a search engine, so I am not neutral, and I will say where it loses. But the point of this post is not my engine. It is a habit, and it fits in one box:</p>
 
@@ -156,7 +156,7 @@
 <tr><td><code>spin_lock</code>, separators relaxed</td><td class="n">9 552</td><td class="n ok">✔ 9 552 <small>23 ms</small></td><td class="n part">▲ 6 577</td><td class="n part">▲ 6 601</td></tr>
 <tr><td><code>spinlokc</code>, two edits, across the boundary</td><td class="n">10 034</td><td class="n ok">✔ 10 034 <small>148 ms</small></td><td class="n part">▲ 3 549</td><td class="n part">▲ 6 557</td></tr>
 <tr><td><code>spin_lock_[a-z]+</code>, a regex</td><td class="n">5 510</td><td class="n ok">✔ 5 510 <small>219 ms</small></td><td class="n part">▲ 5 440 <small>480 ms</small></td><td class="n zero">✘ 0</td></tr>
-<tr><td><code>de</code>, two characters</td><td class="n">93 009</td><td class="n ok">✔ 93 009 <small>561 ms, 7.7 M spans</small></td><td class="n zero">✘ 0</td><td class="n zero">✘ 0</td></tr>
+<tr><td><code>"de"</code>, two characters</td><td class="n">93 009</td><td class="n ok">✔ 93 009 <small>561 ms, 7.7 M spans</small></td><td class="n zero">✘ 0</td><td class="n zero">✘ 0</td></tr>
 <tr><td><code>retur -ENOMEM</code>, a fuzzy phrase</td><td class="n">14 449</td><td class="n ok">✔ 14 449 <small>30 ms</small></td><td class="n ok">✔ 14 446 <small>24 ms</small></td><td class="n">—</td></tr>
 <tr><td>positions of <code>mutex_lock</code>, 5 145 files</td><td class="n">20 797</td><td class="n ok">✔ all <small>15 ms</small></td><td class="n part">▲ top 200 <small>179 ms</small></td><td class="n part">▲ re-read <small>96 ms</small></td></tr>
 </table>
@@ -175,7 +175,7 @@
 
 <p>Read the zeros again. They are the interesting part. An engine that returns 6 577 where the truth is 9 552 is wrong in a way you might notice. An engine that returns <b>0</b> for two characters looks like it worked and found nothing, and nobody notices, because who checks a zero?</p>
 
-<p>To be precise about the word in the title: some of these are bugs; others are consequences of the index configuration, and an Elasticsearch expert will rightly say that with <code>min_gram = 3</code> the query <code>de</code> is unrepresentable by design. True. From the caller's point of view the dangerous part is the same: a plausible-looking answer can still be incomplete, and the API does not distinguish "none" from "I cannot ask that".</p>
+<p>To be precise about the word in the title: some of these are bugs; others are consequences of the index configuration, and an Elasticsearch expert will rightly say that with <code>min_gram = 3</code> the query <code>"de"</code> is unrepresentable by design. True. From the caller's point of view the dangerous part is the same: a plausible-looking answer can still be incomplete, and the API does not distinguish "none" from "I cannot ask that".</p>
 
 <h2 id="wins">Where they win, because they do</h2>
 

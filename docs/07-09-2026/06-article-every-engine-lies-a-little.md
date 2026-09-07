@@ -6,14 +6,14 @@
 
 *Lucie Defraiteur · 7 September 2026*
 
-| `de` — two characters | files |
+| `search "de"` — two letters, over 93 983 files | |
 |---|---|
 | Truth, a scan of the files | **93 009 files** |
 | Elasticsearch, trigram analyzer | **0** |
 | tantivy, n-gram tokenizer | **0** |
 | lucivy | **93 009** |
 
-Here is a thing I did not expect to find: ask a search engine for the two letters `de` over the source of the Linux kernel, and two of the three engines I tested answer **0 documents**. Not an error, not a warning. Zero. The truth is 93 009 of 93 983 files.
+Here is a thing I did not expect to find: ask a search engine for the two letters `"de"` over the source of the Linux kernel, and two of the three engines I tested answer **0 documents**. Not an error, not a warning. Zero. The truth is 93 009 of 93 983 files.
 
 I write a search engine, so I am not neutral, and I will say where it loses. But the point of this post is not my engine. It is a habit, and it fits in one box:
 
@@ -45,7 +45,7 @@ First, the boring sanity check: ordinary substrings work everywhere. `mutex_lock
 | `spin_lock`, separators relaxed | 9 552 | ✔ 9 552  (23 ms) | ▲ 6 577 | ▲ 6 601 |
 | `spinlokc`, two edits, across the boundary | 10 034 | ✔ 10 034  (148 ms) | ▲ 3 549 | ▲ 6 557 |
 | `spin_lock_[a-z]+`, a regex | 5 510 | ✔ 5 510  (219 ms) | ▲ 5 440  (480 ms) | ✘ 0 |
-| `de`, two characters | 93 009 | ✔ 93 009  (561 ms, 7.7 M spans) | ✘ 0 | ✘ 0 |
+| `"de"`, two characters | 93 009 | ✔ 93 009  (561 ms, 7.7 M spans) | ✘ 0 | ✘ 0 |
 | `retur -ENOMEM`, a fuzzy phrase | 14 449 | ✔ 14 449  (30 ms) | ✔ 14 446  (24 ms) | — |
 | positions of `mutex_lock`, 5 145 files | 20 797 | ✔ all  (15 ms) | ▲ top 200  (179 ms) | ▲ re-read  (96 ms) |
 
@@ -60,7 +60,7 @@ What is going on in each column:
 
 Read the zeros again. They are the interesting part. An engine that returns 6 577 where the truth is 9 552 is wrong in a way you might notice. An engine that returns **0** for two characters looks like it worked and found nothing, and nobody notices, because who checks a zero?
 
-To be precise about the word in the title: some of these are bugs; others are consequences of the index configuration, and an Elasticsearch expert will rightly say that with `min_gram = 3` the query `de` is unrepresentable by design. True. From the caller's point of view the dangerous part is the same: a plausible-looking answer can still be incomplete, and the API does not distinguish "none" from "I cannot ask that".
+To be precise about the word in the title: some of these are bugs; others are consequences of the index configuration, and an Elasticsearch expert will rightly say that with `min_gram = 3` the query `"de"` is unrepresentable by design. True. From the caller's point of view the dangerous part is the same: a plausible-looking answer can still be incomplete, and the API does not distinguish "none" from "I cannot ask that".
 
 ## Where they win, because they do
 
