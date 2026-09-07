@@ -170,6 +170,9 @@ page · `f7efcbf` brouillons d'issues.
 
 ## 11. Objectifs, dans l'ordre
 
+*(7 septembre : deux chantiers 4.1 candidats de plus, avant l'import —
+`docs/07-09-2026/05-captures-agregees-et-casse.md`.)*
+
 1. **Poster les réponses aux cinq issues** après relecture de Lucie
    (`01-reponses-issues-4.0.1.md`) ; y annoncer l'import comme chantier ouvert.
 2. **L'import tantivy / Elasticsearch** ([`02-import-tantivy-elasticsearch.md`](02-import-tantivy-elasticsearch.md)),

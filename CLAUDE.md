@@ -346,8 +346,10 @@ cd playground && node serve.mjs
 
 ## Docs
 
-**Le 7 septembre** : `docs/07-09-2026/01-post-reddit.md` (le post Reddit prêt à
-publier, la recette du GIF et du MP4 de `images/`). **Dossier de référence : `docs/06-09-2026/` — pour repartir, lire dans l'ordre
+**Le 7 septembre** : `docs/07-09-2026/01-post-reddit.md` (le cadrage, la recette du GIF et du MP4 de
+`images/`), `02` à `04` les posts prêts à coller par subreddit, `05-captures-agregees-et-casse.md`
+(suggestions 4.1 : captures agrégées d'une regex, option de casse sur `contains` ; ce que la casse
+fait déjà — `contains` insensible, regex sensible, vérifié dans le code). **Dossier de référence : `docs/06-09-2026/` — pour repartir, lire dans l'ordre
 `03-journal-session-6-septembre.md` (la journée du 6 : le chantier indexation
 ×2,1 → ×1,5 et le repli différé, Jaro-Winkler vérifié, la vitrine revue, le
 dictionnaire par défaut, la course trouvée, la compat prouvée avec `main`,
