@@ -21,7 +21,9 @@ Where they win, because they do: tantivy indexes the corpus in 1-5 s against 107
 
 **A few Rust things.** Forked from tantivy 0.22 for the segment layer; the suffix engine, the sharded handle, the snapshot/delta formats and the actor/DAG scheduler (`luciole`, WASM-safe, no `thread::spawn`) are ours. Five crates at the same version. The 4.0 format opens 3.0.x indexes and converts them on the first commit; that contract is a test against a fixture the published 3.0.8 wheel built.
 
-**The demo** below is the real thing: the page clones lucivy's own source from GitHub and indexes 1 272 files in your tab in 3 s, then PostgreSQL's 5 199 files in 14 s, and every search you see is timed live — `--strict`, `--fuzzy 1 "vaccum"`, `--regex "ExecInit[A-Z][a-zA-Z]+\("`, an emoji, a boolean. You can type your own.
+![lucivy demo: lucivy's own source indexed in the browser in 3 s, then PostgreSQL's 5 199 files in 14 s, every search timed live](https://raw.githubusercontent.com/L-Defraiteur/lucivy/main/docs/07-09-2026/images/demo.gif)
+
+**The demo** above is the real thing: the page clones lucivy's own source from GitHub and indexes 1 272 files in your tab in 3 s, then PostgreSQL's 5 199 files in 14 s, and every search you see is timed live — `--strict`, `--fuzzy 1 "vaccum"`, `--regex "ExecInit[A-Z][a-zA-Z]+\("`, an emoji, a boolean. You can type your own.
 
 - [**Try it in your browser**](https://l-defraiteur.github.io/lucivy/) — the playground
 - [Source on GitHub](https://github.com/L-Defraiteur/lucivy) (MIT)

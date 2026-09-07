@@ -6,7 +6,9 @@ Search code the way you grep it: a full-text engine with exact byte spans, verif
 
 **The price** is disk: the index is 5.8× the text (3.9× with an option).
 
-**Where it runs.** A Rust library with Python, Node.js, C++ and browser bindings, MIT. In your process, in your transaction if you plug your own storage, and in the browser: the demo below clones its own source from GitHub and indexes it in your tab in 3 s, then PostgreSQL's 5 199 files in 14 s, every search timed live.
+![lucivy demo: lucivy's own source indexed in the browser in 3 s, then PostgreSQL's 5 199 files in 14 s, every search timed live](https://raw.githubusercontent.com/L-Defraiteur/lucivy/main/docs/07-09-2026/images/demo.gif)
+
+**Where it runs.** A Rust library with Python, Node.js, C++ and browser bindings, MIT. In your process, in your transaction if you plug your own storage, and in the browser: the demo above clones its own source from GitHub and indexes it in your tab in 3 s, then PostgreSQL's 5 199 files in 14 s, every search timed live.
 
 - [**Try it in your browser**](https://l-defraiteur.github.io/lucivy/) — the playground
 - [Source on GitHub](https://github.com/L-Defraiteur/lucivy) (MIT)

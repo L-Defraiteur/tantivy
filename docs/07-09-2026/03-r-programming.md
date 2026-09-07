@@ -21,7 +21,9 @@ Where they win, because they do: tantivy indexes the corpus in 1-5 s against 107
 
 **The price.** Disk: the index is 5.8× the text (3.9× with an option), against 3.6× for Elasticsearch's trigram setup. What you get for it is an index that doesn't lie, and questions the other two cannot ask.
 
-**Where it runs.** It is a library, not a server: Rust, with Python, Node.js and C++ bindings, MIT. It runs in your process, inside your database transaction if you plug your own storage, and the same engine runs in the browser — the demo below clones its own source from GitHub and indexes it in your tab in 3 s, then PostgreSQL's 5 199 files in 14 s, every search timed live. You can type your own.
+![lucivy demo: lucivy's own source indexed in the browser in 3 s, then PostgreSQL's 5 199 files in 14 s, every search timed live](https://raw.githubusercontent.com/L-Defraiteur/lucivy/main/docs/07-09-2026/images/demo.gif)
+
+**Where it runs.** It is a library, not a server: Rust, with Python, Node.js and C++ bindings, MIT. It runs in your process, inside your database transaction if you plug your own storage, and the same engine runs in the browser — the demo above clones its own source from GitHub and indexes it in your tab in 3 s, then PostgreSQL's 5 199 files in 14 s, every search timed live. You can type your own.
 
 - [**Try it in your browser**](https://l-defraiteur.github.io/lucivy/) — the playground
 - [Source on GitHub](https://github.com/L-Defraiteur/lucivy) (MIT)
