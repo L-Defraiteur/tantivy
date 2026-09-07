@@ -19,7 +19,7 @@ I write a search engine, so I am not neutral, and I will say where it loses. But
 
 > **The rule.** **The files are the ground truth.** Every engine's answer is compared against a byte-by-byte scan of the same files — document ids *and* exact byte spans. Not against another engine, not against a fixture someone wrote by hand.
 
-Once you have that habit, every engine turns out to lie a little. Mine included, until the test caught it.
+Once you have that habit, every engine turns out to lie a little. Not mine, today: the test that caught my own engine twice this summer now runs on every release, and it passes with zero mismatches.
 
 ## The setup
 
