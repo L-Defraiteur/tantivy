@@ -52,7 +52,7 @@ This is not a hit piece. Same corpus, same machine, idle:
 | lucivy 4.0 | 4 926 MB | ×5.8 | 107 s |
 | lucivy 4.0 with `derived_in_ram` | 3 335 MB | ×3.9 | 111 s |
 
-tantivy indexes this corpus in one to five seconds. Mine takes a hundred. Its index is seven times smaller. On a whole-word query it answers in 0 ms where mine takes 27. Elasticsearch does the fuzzy phrase as well as I do, and its cluster does things my library will never do. If your queries are whole words, use them and be happy.
+tantivy indexes this corpus in one to five seconds. Mine takes a hundred. Its index is seven times smaller. On a whole-word query it answers in 0 ms where mine takes 27. Elasticsearch does the fuzzy phrase as well as I do. If your queries are whole words, use them and be happy. And note the difference of kind: Elasticsearch is a service you run next to your application; mine is a library that goes inside it. The index lives in your process, in your transaction if you plug your own storage, on your machine — nothing to deploy beside your service, nothing that leaves it, and the same engine runs in the browser with the data staying in the tab.
 
 What my index buys with its size is the other half of the first table: the questions a trigram index cannot ask, and the exact position of every match delivered with the answer instead of recomputed for the top 200.
 
