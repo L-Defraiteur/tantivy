@@ -23,11 +23,12 @@ database.
 [**Try the live playground**](https://l-defraiteur.github.io/lucivy/) — it clones
 lucivy's own source from GitHub and indexes it in your browser in a few seconds.
 
-![The presentation page running: it clones lucivy's own source from GitHub, indexes 1 171 files in the browser in 3 s, then runs substring, relaxed-separator, fuzzy, emoji, regex and boolean searches with their measured times and exact highlights — ending on a query typed live, two typos away from its match](docs/28-08-2026/images/demo.gif)
+![The presentation page's terminal: it clones lucivy's own source from GitHub and indexes 1 272 files in the browser in 3 s, runs substring, relaxed-separator, fuzzy, emoji, regex, boolean and filtered searches with their measured times and exact highlights, then indexes PostgreSQL's 5 199 files in 14 s and searches them strict, fuzzy and by regex](docs/07-09-2026/images/demo.gif)
 
 *Nothing is pre-recorded in that terminal: it is the page doing the work in a
-tab. The last query is typed by hand — `--fuzzy 2 "ShardedHandel"` finds
-`ShardedHandle` in 51 ms.*
+tab. The second half is typed by hand — `index postgres`, then `--strict
+"heap_insert"`, `"CREATE INDEX CONCURRENTLY"` (27 hits, 11 ms), `--fuzzy 1
+"vaccum"` (17 ms) and `--regex "ExecInit[A-Z][a-zA-Z]+\("` (20 ms).*
 
 ### What's new in 4.0.0
 

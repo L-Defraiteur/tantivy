@@ -346,7 +346,8 @@ cd playground && node serve.mjs
 
 ## Docs
 
-**Dossier courant : `docs/06-09-2026/` — pour repartir, lire dans l'ordre
+**Le 7 septembre** : `docs/07-09-2026/01-post-reddit.md` (le post Reddit prêt à
+publier, la recette du GIF et du MP4 de `images/`). **Dossier de référence : `docs/06-09-2026/` — pour repartir, lire dans l'ordre
 `03-journal-session-6-septembre.md` (la journée du 6 : le chantier indexation
 ×2,1 → ×1,5 et le repli différé, Jaro-Winkler vérifié, la vitrine revue, le
 dictionnaire par défaut, la course trouvée, la compat prouvée avec `main`,
