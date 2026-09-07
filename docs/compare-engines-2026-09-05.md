@@ -44,6 +44,28 @@ lucivy's time is the search alone (documents and every span); Elasticsearch's is
 
 Read across a row: the same question, what each engine can make of it (an Elasticsearch time here may be a cache hit: the same query already ran in §2). (its trigrams carry them); tantivy's default tokenizer cannot keep them (the separator never enters the index), and its n-gram tokenizer emits every position as 0, so its substring rows are an AND of trigrams verified by reading each candidate's stored text — the application's work, timed here as such. Both engines' fuzziness stops at their token boundary. An n-gram index has nothing to look up below three characters. The fuzzy phrase is the case Elasticsearch handles well, with `span_near`.
 
+
+## 3 bis. Probed on 7 September 2026 — separators, symbols, mid-token starts
+
+Twelve more substrings, asked strictly, on the same indexes (Elasticsearch `cmp_ngram`, a `match_phrase` on the trigram field; tantivy's trigram index through the verified path of §3; lucivy's dictionary index rebuilt in 107.9 s). The truth is the same scan. Bold = matches the scan.
+
+| asked (strict) | truth | lucivy | Elasticsearch, trigrams | tantivy, trigrams verified |
+|---|---|---|---|---|
+| `de`, two characters | 93 009 | **93 009**, 565 ms, 7 695 534 spans | 0, 5 ms | 0 (no trigram) |
+| `©`, one character, a symbol | 1 878 | **1 878**, 6 ms, 2 076 spans | 0, 1 ms | 0 (no trigram) |
+| `→`, one character | 34 | **34**, 5 ms | 0, 1 ms | 0 (no trigram) |
+| `Müller` | 3 | **3**, 8 ms | **3**, 36 ms | **3** (5 candidates) |
+| `naïve` | 3 | **3**, 5 ms | **3**, 6 ms | **3** |
+| `pin_loc` — starts and ends mid-token, across the underscore | 6 591 | **6 591**, 18 ms, 34 885 spans | **6 591**, 79 ms | **6 591**, 173 ms (8 352 candidates re-read) |
+| `utex_loc` | 5 170 | **5 170**, 11 ms | **5 170**, 52 ms | **5 170**, 99 ms |
+| `int i` — a space inside | 25 036 | **25 036**, 17 ms | **25 036**, 30 ms | **25 036**, 563 ms (45 359 candidates re-read) |
+| `return -ENOMEM;` | 14 411 | **14 411**, 17 ms | **14 411**, 88 ms | **14 411**, 225 ms |
+| `spin_lock(&` | 2 538 | **2 538**, 12 ms | **2 538**, 29 ms | **2 538**, 75 ms |
+| `->next` | 1 972 | **1 972**, 18 ms | **1 972**, 15 ms | **1 972**, 56 ms |
+| `#include <linux/` | 40 697 | **40 697**, 72 ms | **40 697**, 55 ms | **40 697**, 455 ms (40 741 candidates re-read) |
+
+What this settles. Once an engine is set up with trigrams over the whole character stream, a substring of three characters or more is found whatever it contains — a separator, a space, an accent, a start in the middle of a token: `pin_loc` is right on all three. The structural failures are the ones §3 already shows: **anything under three characters is a silent zero** (`de`, and a copyright sign present in 1 878 files), fuzziness across a boundary, a regex on cut terms, and the price of positions. tantivy's verified path is correct by construction and pays for it in reading: the AND of common trigrams keeps 40 741 of 93 983 documents for `#include <linux/`, and every one of them is re-read. The kernel tree holds no emoji, so none was measured; a single emoji is one character and falls in the first class, an emoji inside a longer needle in the second. Probe: `CMP_CORPUS=… CMP_PROBE='a|b' cargo test --release -p lucivy-core --test compare_tantivy probe_substrings -- --ignored --nocapture`; the Elasticsearch side was twelve `match_phrase` calls; lucivy the harness with `V3_QUERIES`.
+
 ## 4. The price of knowing where
 
 | engine | documents | spans reported | in how many documents | time |

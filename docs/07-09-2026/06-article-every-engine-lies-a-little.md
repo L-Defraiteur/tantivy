@@ -47,6 +47,7 @@ First, the boring sanity check: ordinary substrings work everywhere. `mutex_lock
 | `spinlokc`, two edits, across the boundary | 10 034 | ✔ 10 034  (148 ms) | ▲ 3 549 | ▲ 6 557 |
 | `spin_lock_[a-z]+`, a regex | 5 510 | ✔ 5 510  (219 ms) | ▲ 5 440  (480 ms) | ✘ 0 |
 | `"de"`, two characters | 93 009 | ✔ 93 009  (561 ms, 7.7 M spans) | ✘ 0 | ✘ 0 |
+| `"©"`, one character, in 1 878 files | 1 878 | ✔ 1 878 (6 ms) | ✘ 0 | ✘ 0 |
 | `retur -ENOMEM`, a fuzzy phrase | 14 449 | ✔ 14 449  (30 ms) | ✔ 14 446  (24 ms) | — |
 | positions of `mutex_lock`, 5 145 files | 20 797 | ✔ all  (15 ms) | ▲ top 200  (179 ms) | ▲ re-read  (96 ms) |
 
@@ -58,7 +59,7 @@ What is going on in each column:
 - **The typo.** `spinlokc` is one transposition away from `spin_lock`, but the transposition straddles the underscore. Term-level fuzziness compares the query to whole terms, and no single term is within two edits of it. The count is not zero, so it looks fine.
 - **The regex.** tantivy's terms are already cut into grams; there is nothing left for a regex to run on. Elasticsearch's `wildcard` field gets close and misses 70.
 - **Two characters.** Shorter than a trigram: unrepresentable in both indexes. Zero, and nothing tells you.
-- **Any byte.** A suffix index over bytes has no notion of "symbol": `rust🦀lang`, `brûlée`, `-ENOMEM;` are substrings like any other. On lucivy's own source, `"rust🦀lang"` is 5 files in 8.9 ms in the browser demo. I did not measure emoji on the other two engines, so no row: the standard analyzer of Elasticsearch drops symbols by design, its trigram analyzer keeps them, and I would rather not guess the rest.
+- **Any byte.** A suffix index over bytes has no notion of "symbol": `©`, `→`, `Müller`, `-ENOMEM;` are substrings like any other. To be fair about what trigrams can do: once an engine runs them over the whole character stream, a substring of three characters or more is found whatever it holds — `pin_loc`, which starts and ends in the middle of tokens across an underscore, is 6 591 on all three (lucivy 18 ms, Elasticsearch 79, tantivy 173). What they cannot see is anything shorter than a trigram: a copyright sign present in 1 878 files is a silent zero on both, like `"de"`. The kernel holds no emoji, so I did not measure one; a lone emoji is one character and falls in the same hole.
 - **Positions.** Elasticsearch recomputes highlights on the top 200 documents you ask for; tantivy re-reads the stored text of every candidate. lucivy stores positions in the index and returns all of them with the answer.
 
 Read the zeros again. They are the interesting part. An engine that returns 6 577 where the truth is 9 552 is wrong in a way you might notice. An engine that returns **0** for two characters looks like it worked and found nothing, and nobody notices, because who checks a zero?

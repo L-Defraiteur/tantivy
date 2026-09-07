@@ -416,3 +416,43 @@ fn probe_default_tokenizer() {
         eprintln!("  {input:<24} -> {}", toks.join(" "));
     }
 }
+
+/// Where does the honest trigram path stumble? `CMP_PROBE="a|b|c"` runs each
+/// needle as a verified substring on the trigram index and prints, next to it,
+/// the truth counted on the files in memory (case-insensitive `contains`, the
+/// same question lucivy's harness asks). A needle under three characters has no
+/// trigram and returns nothing; a needle whose trigrams are everywhere makes the
+/// AND useless and the verification re-read most of the corpus — the two ways a
+/// verified n-gram index can fail: silently, or slowly.
+#[test]
+#[ignore]
+fn probe_substrings() {
+    let root = corpus_root();
+    let files = collect(Path::new(&root));
+    assert!(!files.is_empty(), "empty corpus — set CMP_CORPUS");
+    let probes = std::env::var("CMP_PROBE").unwrap_or_else(|_| "de|©|→|Müller|naïve|pin_loc|utex_loc|int i|return -ENOMEM;|spin_lock(&|->next|#include <linux/".into());
+    let dir = "/tmp/tv_ngram";
+    let tri = if std::env::var("CMP_REUSE").is_ok() && Path::new(dir).join("meta.json").exists() {
+        let index = TvIndex::open_in_dir(dir).unwrap();
+        let analyzer = TextAnalyzer::builder(NgramTokenizer::new(3, 3, false).unwrap()).filter(LowerCaser).build();
+        index.tokenizers().register("tri", analyzer);
+        let content = index.schema().get_field("content").unwrap();
+        Built { index, content, seconds: 0.0, bytes: dir_size(dir) }
+    } else {
+        build(&files, dir, true)
+    };
+    eprintln!("{} files; trigram index {:.0} MB", files.len(), tri.bytes as f64 / 1_048_576.0);
+    eprintln!("{:<22} {:>8} {:>10} {:>9} {:>10}   note", "needle", "truth", "candidates", "verified", "time");
+    let lowered: Vec<String> = files.iter().map(|(_, c)| c.to_lowercase()).collect();
+    for needle in probes.split('|') {
+        let lower = needle.to_lowercase();
+        let t = Instant::now();
+        let truth = lowered.iter().filter(|c| c.contains(&lower)).count();
+        let truth_ms = t.elapsed().as_secs_f64() * 1000.0;
+        let (cand, verified, _spans, ms) = verified_substring(&tri, needle, 0);
+        let note = if needle.chars().count() < 3 { "no trigram: nothing to look up" }
+            else if cand > 0 && cand as f64 > files.len() as f64 * 0.3 { "the AND keeps most of the corpus: verification re-reads it" }
+            else if verified != truth { "COUNT DIFFERS" } else { "" };
+        eprintln!("{:<22} {:>8} {:>10} {:>9} {:>8.0}ms   {} (scan {:.0} ms)", format!("{needle:?}"), truth, cand, verified, ms, note, truth_ms);
+    }
+}
