@@ -11,7 +11,8 @@
 default index once: it answers exact substrings, matches across separators
 (`spin_lock`, `spin lock`, `spinlock`), typos that straddle a token boundary,
 regular expressions and two-character needles — with BM25 ranking and the exact
-bytes of every match — and nothing to configure per question. The ground-truth
+bytes of every match — and nothing to configure per question: **you decide what
+to ask when you ask it, not at index time when you picked an analyzer.** The ground-truth
 harness compares each answer, documents *and* byte spans, to a byte-by-byte scan
 of the files (93 983 Linux kernel files, ten query modes, zero mismatches), and
 judges Elasticsearch and tantivy by the same scan. A library: in your process,

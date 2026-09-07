@@ -92,7 +92,7 @@ tantivy indexes this corpus in one to five seconds. Mine takes a hundred. Its in
 
 And note the difference of kind: Elasticsearch is a service you run next to your application; mine is a library that goes inside it. The index lives in your process, in your transaction if you plug your own storage, on your machine — nothing to deploy beside your service, nothing that leaves it, and the same engine runs in the browser with the data staying in the tab.
 
-What my index buys with its size is the first table: the questions a trigram index cannot ask, and the exact position of every match delivered with the answer instead of recomputed for the top 200.
+What my index buys with its size is the first table: the questions a trigram index cannot ask, and the exact position of every match delivered with the answer instead of recomputed for the top 200. Put more simply: **you decide what to ask when you ask it, not six months earlier when you picked an analyzer.** Every zero in that table is a decision taken at index time — `min_gram = 3`, a tokenizer that drops separators — that forbids a question forever. A suffix index takes no such decision; strict or relaxed, exact or fuzzy, regex or two characters are options of the query.
 
 ## The method is the point
 

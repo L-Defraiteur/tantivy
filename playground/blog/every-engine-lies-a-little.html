@@ -64,7 +64,7 @@
   /* headline numbers */
   .heads { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 18px 0 26px; }
   .head { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
-  .head .n { font-family: "SF Mono", "Fira Code", monospace; font-size: 24px; font-weight: 700; line-height: 1.2; }
+  .head .n { font-family: "SF Mono", "Fira Code", monospace; font-size: 20px; white-space: nowrap; font-weight: 700; line-height: 1.2; }
   .head .n .from { color: var(--green); } .head .n .to { color: var(--red); } .head .n .ok { color: var(--green); }
   .head .d { font-size: 13.5px; color: var(--text-dim); margin-top: 6px; line-height: 1.4; }
   @media (max-width: 600px) { .heads { grid-template-columns: 1fr; } }
@@ -205,7 +205,7 @@
 
 <p>And note the difference of kind: Elasticsearch is a service you run next to your application; mine is a library that goes inside it. The index lives in your process, in your transaction if you plug your own storage, on your machine — nothing to deploy beside your service, nothing that leaves it, and the same engine runs in the browser with the data staying in the tab.</p>
 
-<p>What my index buys with its size is the first table: the questions a trigram index cannot ask, and the exact position of every match delivered with the answer instead of recomputed for the top 200.</p>
+<p>What my index buys with its size is the first table: the questions a trigram index cannot ask, and the exact position of every match delivered with the answer instead of recomputed for the top 200. Put more simply: <b>you decide what to ask when you ask it, not six months earlier when you picked an analyzer.</b> Every zero in that table is a decision taken at index time — <code>min_gram = 3</code>, a tokenizer that drops separators — that forbids a question forever. A suffix index takes no such decision; strict or relaxed, exact or fuzzy, regex or two characters are options of the query.</p>
 
 <h2 id="method">The method is the point</h2>
 
