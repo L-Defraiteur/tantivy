@@ -351,7 +351,8 @@ cd playground && node serve.mjs
 publié sur `playground/blog/` — la page canonique, lien « blog » dans l'en-tête de la vitrine),
 `07-soumettre-article-hn-lobsters-twir.md` (comment et quand le soumettre), `08-sonde-tantivy-elasticsearch.md`
 (la sonde : trigrammes configurés = tout ≥ 3 caractères trouvé, `pin_loc` compris ; < 3 = zéro silencieux, `©` ;
-rapport §3 bis), `05-captures-agregees-et-casse.md`
+rapport §3 bis), `09-pistes-taille-index.md` (la composition de l'index du noyau fichier par fichier et trois pistes :
+positions optionnelles avec spans par relecture, suffixes aux frontières de sous-mots, `.gmap`), `05-captures-agregees-et-casse.md`
 (suggestions 4.1 : captures agrégées d'une regex, option de casse sur `contains` ; ce que la casse
 fait déjà — `contains` insensible, regex sensible, vérifié dans le code). **Dossier de référence : `docs/06-09-2026/` — pour repartir, lire dans l'ordre
 `03-journal-session-6-septembre.md` (la journée du 6 : le chantier indexation
