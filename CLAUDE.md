@@ -346,6 +346,9 @@ cd playground && node serve.mjs
 
 ## Docs
 
+**Chantier en cours (8 septembre, branche `v4.1`)** : `docs/08-09-2026/01-chantier-positions-optionnelles.md`
+— l'index sans positions (`positions: false`, spans par relecture du texte stocké), le design en trois
+régimes et les six étapes ; mesuré : postings 1 398 → 296 Mo, dérivés 1 667 → 0, noyau ≈ ×2,6 le texte.
 **Le 7 septembre** : `docs/07-09-2026/01-post-reddit.md` (le cadrage, la recette du GIF et du MP4 de
 `images/`), `02` à `04` les posts prêts à coller par subreddit, `06-article-every-engine-lies-a-little.md` (l'article,
 publié sur `playground/blog/` — la page canonique, lien « blog » dans l'en-tête de la vitrine),
